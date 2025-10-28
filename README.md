@@ -16,6 +16,8 @@ An interactive 3D portfolio website inspired by Bruno Simon's legendary portfoli
 - **🎯 Interactive Prompts**: Get notified when driving over a section
 - **📝 Modal Content**: Detailed information displays in elegant overlays
 - **📐 Text Labels**: Section names printed directly on the ground platforms
+- **🌳 Environmental Objects**: Trees, pillars, boundary markers, and decorative elements for visual feedback
+- **🛣️ Path Markers**: Central path guides you between sections
 
 ## 🎮 Controls
 
@@ -138,6 +140,21 @@ Each platform:
 - Shows section name printed on the surface
 - Triggers an interaction prompt when car approaches
 - Opens a modal with detailed content when pressing E
+
+## 🌳 Environmental Objects
+
+The world is populated with various objects to provide visual feedback and depth:
+
+- **12 Trees** - Brown trunks with green foliage, scattered throughout the world
+- **12 Decorative Pillars** - Purple-topped posts positioned around sections
+- **28 Boundary Markers** - Purple cubes marking the edges of the playable area
+- **9 Decorative Cubes** - Small purple cubes scattered for visual interest
+- **9 Path Markers** - White/gray markers creating a central path between sections
+
+All objects:
+- Cast and receive shadows for realism
+- Adapt colors when switching between light/dark themes
+- Provide reference points to see car movement clearly
 
 ## 🖥️ Browser Support
 

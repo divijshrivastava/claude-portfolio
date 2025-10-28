@@ -179,6 +179,9 @@ function init() {
     // Create portfolio section platforms
     createSectionPlatforms();
 
+    // Create environmental objects
+    createEnvironment();
+
     // Create car
     createCar();
 
@@ -323,6 +326,153 @@ function createPlatformText(text, x, z) {
     scene.add(plane);
 }
 
+function createEnvironment() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Trees scattered around
+    const treePositions = [
+        { x: -25, z: 5 }, { x: 25, z: 5 }, { x: -30, z: -20 },
+        { x: 30, z: -20 }, { x: 0, z: -50 }, { x: -35, z: -45 },
+        { x: 35, z: -45 }, { x: -40, z: 10 }, { x: 40, z: 10 },
+        { x: -10, z: 20 }, { x: 10, z: 20 }, { x: 0, z: -60 }
+    ];
+
+    treePositions.forEach(pos => {
+        // Tree trunk
+        const trunkGeometry = new THREE.CylinderGeometry(0.4, 0.5, 3, 8);
+        const trunkMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x4a3428 : 0x6b4423,
+            roughness: 0.9
+        });
+        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+        trunk.position.set(pos.x, 1.5, pos.z);
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+        scene.add(trunk);
+
+        // Tree foliage (sphere)
+        const foliageGeometry = new THREE.SphereGeometry(2, 8, 8);
+        const foliageMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x2d5a2d : 0x4a9d4a,
+            roughness: 0.8
+        });
+        const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+        foliage.position.set(pos.x, 4, pos.z);
+        foliage.castShadow = true;
+        foliage.receiveShadow = true;
+        scene.add(foliage);
+    });
+
+    // Decorative pillars/posts around sections
+    const pillarPositions = [
+        { x: -20, z: -5 }, { x: -10, z: -5 }, { x: 10, z: -5 }, { x: 20, z: -5 },
+        { x: -20, z: -15 }, { x: 20, z: -15 },
+        { x: -20, z: -30 }, { x: -10, z: -30 }, { x: 10, z: -30 }, { x: 20, z: -30 },
+        { x: -20, z: -40 }, { x: 20, z: -40 }
+    ];
+
+    pillarPositions.forEach(pos => {
+        const pillarGeometry = new THREE.CylinderGeometry(0.3, 0.3, 4, 8);
+        const pillarMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x3a3a3a : 0xb8b0c0,
+            roughness: 0.6,
+            metalness: 0.4
+        });
+        const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+        pillar.position.set(pos.x, 2, pos.z);
+        pillar.castShadow = true;
+        pillar.receiveShadow = true;
+        scene.add(pillar);
+
+        // Top sphere decoration
+        const topGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+        const topMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x6d4579 : 0x8b5a9e,
+            roughness: 0.4,
+            metalness: 0.6,
+            emissive: isDark ? 0x6d4579 : 0x8b5a9e,
+            emissiveIntensity: 0.2
+        });
+        const top = new THREE.Mesh(topGeometry, topMaterial);
+        top.position.set(pos.x, 4.5, pos.z);
+        top.castShadow = true;
+        scene.add(top);
+    });
+
+    // Boundary markers at edges
+    const boundaryPositions = [
+        // Front
+        { x: -50, z: 20 }, { x: -30, z: 20 }, { x: -10, z: 20 },
+        { x: 10, z: 20 }, { x: 30, z: 20 }, { x: 50, z: 20 },
+        // Back
+        { x: -50, z: -70 }, { x: -30, z: -70 }, { x: -10, z: -70 },
+        { x: 10, z: -70 }, { x: 30, z: -70 }, { x: 50, z: -70 },
+        // Left
+        { x: -50, z: 0 }, { x: -50, z: -20 }, { x: -50, z: -40 }, { x: -50, z: -60 },
+        // Right
+        { x: 50, z: 0 }, { x: 50, z: -20 }, { x: 50, z: -40 }, { x: 50, z: -60 }
+    ];
+
+    boundaryPositions.forEach(pos => {
+        const boundaryGeometry = new THREE.BoxGeometry(1.5, 2, 1.5);
+        const boundaryMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x5a3d54 : 0xa87ab8,
+            roughness: 0.5,
+            metalness: 0.5
+        });
+        const boundary = new THREE.Mesh(boundaryGeometry, boundaryMaterial);
+        boundary.position.set(pos.x, 1, pos.z);
+        boundary.castShadow = true;
+        boundary.receiveShadow = true;
+        scene.add(boundary);
+    });
+
+    // Small decorative cubes scattered around
+    const cubePositions = [
+        { x: -5, z: 0, size: 0.8 }, { x: 5, z: 0, size: 0.6 },
+        { x: -8, z: -22, size: 0.7 }, { x: 8, z: -22, size: 0.9 },
+        { x: 0, z: -45, size: 0.5 }, { x: -25, z: -12, size: 0.6 },
+        { x: 25, z: -12, size: 0.8 }, { x: -25, z: -38, size: 0.7 },
+        { x: 25, z: -38, size: 0.6 }
+    ];
+
+    cubePositions.forEach(pos => {
+        const cubeGeometry = new THREE.BoxGeometry(pos.size, pos.size, pos.size);
+        const cubeMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x4a3a4a : 0xc0b0d0,
+            roughness: 0.6,
+            metalness: 0.3
+        });
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        cube.position.set(pos.x, pos.size / 2, pos.z);
+        cube.rotation.y = Math.random() * Math.PI;
+        cube.castShadow = true;
+        cube.receiveShadow = true;
+        scene.add(cube);
+    });
+
+    // Road/path markers between sections
+    const pathMarkers = [
+        { x: 0, z: 0 }, { x: 0, z: -5 }, { x: 0, z: -10 },
+        { x: 0, z: -15 }, { x: 0, z: -20 }, { x: 0, z: -25 },
+        { x: 0, z: -30 }, { x: 0, z: -35 }, { x: 0, z: -40 }
+    ];
+
+    pathMarkers.forEach(pos => {
+        const markerGeometry = new THREE.BoxGeometry(1, 0.1, 1);
+        const markerMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x6d6d6d : 0xffffff,
+            roughness: 0.8,
+            transparent: true,
+            opacity: 0.6
+        });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.set(pos.x, 0.06, pos.z);
+        marker.receiveShadow = true;
+        scene.add(marker);
+    });
+}
+
 function addEventListeners() {
     // Start button
     document.getElementById('startButton').addEventListener('click', () => {
@@ -368,6 +518,35 @@ function toggleTheme() {
     scene.children.forEach(child => {
         if (child.geometry && child.geometry.type === 'PlaneGeometry' && child.position.y === 0) {
             child.material.color.setHex(isDark ? 0x242424 : 0xd8d0dc);
+        }
+        // Update tree colors
+        if (child.geometry && child.geometry.type === 'CylinderGeometry' && child.position.y === 1.5) {
+            child.material.color.setHex(isDark ? 0x4a3428 : 0x6b4423);
+        }
+        if (child.geometry && child.geometry.type === 'SphereGeometry' && child.position.y > 3) {
+            if (child.position.y < 4.2) { // Tree foliage
+                child.material.color.setHex(isDark ? 0x2d5a2d : 0x4a9d4a);
+            } else if (child.position.y > 4.2) { // Pillar tops
+                child.material.color.setHex(isDark ? 0x6d4579 : 0x8b5a9e);
+                child.material.emissive.setHex(isDark ? 0x6d4579 : 0x8b5a9e);
+            }
+        }
+        // Update pillars
+        if (child.geometry && child.geometry.type === 'CylinderGeometry' && child.position.y === 2) {
+            child.material.color.setHex(isDark ? 0x3a3a3a : 0xb8b0c0);
+        }
+        // Update boundary markers
+        if (child.geometry && child.geometry.type === 'BoxGeometry' && child.position.y === 1 &&
+            (Math.abs(child.position.x) >= 50 || Math.abs(child.position.z) >= 60)) {
+            child.material.color.setHex(isDark ? 0x5a3d54 : 0xa87ab8);
+        }
+        // Update decorative cubes
+        if (child.geometry && child.geometry.type === 'BoxGeometry' && child.position.y < 0.5 && child.position.y > 0.2) {
+            child.material.color.setHex(isDark ? 0x4a3a4a : 0xc0b0d0);
+        }
+        // Update path markers
+        if (child.geometry && child.geometry.type === 'BoxGeometry' && child.position.y === 0.06) {
+            child.material.color.setHex(isDark ? 0x6d6d6d : 0xffffff);
         }
     });
 }
