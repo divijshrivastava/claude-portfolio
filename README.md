@@ -5,7 +5,7 @@ An interactive 3D portfolio website inspired by Bruno Simon's legendary portfoli
 ## ✨ Features
 
 - **🚗 Drive a 3D Car**: Control a purple car through a 3D world with realistic physics
-- **🌍 Top-Down View**: Sky camera that follows the car as you drive
+- **🎥 Dynamic Camera**: Adjust camera angle with mouse wheel from top-down to ground-level view
 - **🎮 Interactive Playground**: Each portfolio item is a unique 3D object in the world
 - **💥 Physics-Based Collisions**: Solid objects block your path, movable objects get pushed
 - **🔊 Sound Effects**: Engine sounds that change with speed, collision sounds
@@ -26,6 +26,7 @@ An interactive 3D portfolio website inspired by Bruno Simon's legendary portfoli
 - **S** or **↓** - Brake / Reverse
 - **A** or **←** - Turn left (while moving)
 - **D** or **→** - Turn right (while moving)
+- **Mouse Wheel** - Adjust camera angle (scroll down for ground view, scroll up for top-down view)
 - **E** - Interact with objects (when nearby)
 
 ## 🛠️ Technologies Used
