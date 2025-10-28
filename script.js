@@ -14,11 +14,11 @@ const acceleration = 0.01;
 const deceleration = 0.005;
 const turnSpeed = 0.015; // Reduced from 0.03 for slower rotation
 
-// Camera control variables
-let cameraAngle = Math.PI / 3; // Initial angle (60 degrees from horizontal)
-const minCameraAngle = Math.PI / 6; // 30 degrees (lower, more behind view)
-const maxCameraAngle = Math.PI / 2.2; // ~80 degrees (higher, more top-down)
-const cameraDistance = 25;
+// Camera control variables (adjusted for 4x playground)
+let cameraAngle = Math.PI / 4; // Initial angle (45 degrees from horizontal) - more dynamic
+const minCameraAngle = Math.PI / 8; // 22.5 degrees (lower, more behind view)
+const maxCameraAngle = Math.PI / 2.5; // ~72 degrees (higher, more top-down)
+const cameraDistance = 36; // 2x closer camera relative to scale (was 18, could be 72 for 4x, but 36 is better)
 
 // Mute state
 let isMuted = false;
@@ -51,15 +51,15 @@ let engineGainNode;
 
 // Initialize
 function init() {
-    // Scene
+    // Scene with new cyberpunk color theme
     scene = new THREE.Scene();
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    scene.background = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
-    scene.fog = new THREE.Fog(isDark ? 0x1a1a1a : 0xe8e4f0, 50, 150);
+    scene.background = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff); // Deep space blue / soft blue white
+    scene.fog = new THREE.Fog(isDark ? 0x0a0e27 : 0xf0f4ff, 200, 600); // 4x fog distance
 
-    // Camera - Top-down view
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 25, 15);
+    // Camera - More dynamic angle view (Bruno Simon style, adjusted for larger space)
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 24, 24);
     camera.lookAt(0, 0, 0);
 
     // Renderer
@@ -70,14 +70,14 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Lights - GTA style with warmer tones
-    const ambientLight = new THREE.AmbientLight(0xfff4e6, 0.5); // Warmer ambient
+    // Lights - Cyberpunk neon style
+    const ambientLight = new THREE.AmbientLight(isDark ? 0x4a5a8a : 0xd1dfff, isDark ? 0.4 : 0.6);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xfff8dc, 1.0); // Warmer sun
+    const directionalLight = new THREE.DirectionalLight(isDark ? 0x00d4ff : 0xffffff, isDark ? 0.8 : 1.0); // Cyan/white main light
     directionalLight.position.set(30, 50, 20);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 4096; // Better shadows
+    directionalLight.shadow.mapSize.width = 4096;
     directionalLight.shadow.mapSize.height = 4096;
     directionalLight.shadow.camera.left = -100;
     directionalLight.shadow.camera.right = 100;
@@ -85,8 +85,8 @@ function init() {
     directionalLight.shadow.camera.bottom = -100;
     scene.add(directionalLight);
 
-    // Add secondary light for depth
-    const fillLight = new THREE.DirectionalLight(0x87ceeb, 0.3);
+    // Add secondary neon light for depth
+    const fillLight = new THREE.DirectionalLight(isDark ? 0xff2e97 : 0x6b2bff, isDark ? 0.4 : 0.3); // Pink/purple fill
     fillLight.position.set(-20, 30, -20);
     scene.add(fillLight);
 
@@ -345,8 +345,8 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
 
     // Border - thicker and more visible
     context.strokeStyle = textColor;
-    context.lineWidth = 16;
-    context.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+    context.lineWidth = 20;
+    context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
 
     // Text with better readability
     context.fillStyle = textColor;
@@ -355,14 +355,14 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
 
     const lines = text.split('\n');
 
-    // Dynamic font size based on content
-    let fontSize = isBillboard ? 120 : 96; // Much larger fonts
-    const lineHeight = fontSize + 20;
+    // SIGNIFICANTLY increased font sizes for better readability
+    let fontSize = isBillboard ? 180 : 140; // Much larger fonts
+    const lineHeight = fontSize + 40;
 
     // First line (title) is bigger
     lines.forEach((line, index) => {
         if (index === 0 && lines.length > 1) {
-            context.font = `bold ${fontSize * 1.3}px Arial, sans-serif`; // Bolder, clearer font
+            context.font = `bold ${fontSize * 1.4}px Arial, sans-serif`; // Bolder, clearer font
         } else {
             context.font = `600 ${fontSize}px Arial, sans-serif`;
         }
@@ -370,10 +370,10 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
         const y = (canvas.height - lines.length * lineHeight) / 2 + index * lineHeight;
 
         // Add text shadow for better readability
-        context.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        context.shadowBlur = 4;
-        context.shadowOffsetX = 2;
-        context.shadowOffsetY = 2;
+        context.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        context.shadowBlur = 8;
+        context.shadowOffsetX = 4;
+        context.shadowOffsetY = 4;
 
         context.fillText(line, canvas.width / 2, y);
     });
@@ -405,12 +405,14 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
 }
 
 function createUrbanGround(isDark) {
-    // Main ground - asphalt/concrete mix
-    const groundGeometry = new THREE.PlaneGeometry(200, 200, 20, 20);
+    // Main ground - cyberpunk neon grid style (4x larger)
+    const groundGeometry = new THREE.PlaneGeometry(800, 800, 20, 20);
     const groundMaterial = new THREE.MeshStandardMaterial({
-        color: isDark ? 0x2a2a2a : 0x505050,
-        roughness: 0.95,
-        metalness: 0.05
+        color: isDark ? 0x0f1933 : 0xc5d5ff, // Deep navy / light blue
+        roughness: isDark ? 0.8 : 0.9,
+        metalness: isDark ? 0.2 : 0.1,
+        emissive: isDark ? 0x1a2844 : 0x000000,
+        emissiveIntensity: isDark ? 0.2 : 0
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
@@ -428,25 +430,30 @@ function createUrbanGround(isDark) {
 }
 
 function createRoadMarkings() {
-    // Main road down the center
-    const roadGeometry = new THREE.PlaneGeometry(12, 180);
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Main road down the center (4x larger) - neon style
+    const roadGeometry = new THREE.PlaneGeometry(48, 720);
     const roadMaterial = new THREE.MeshStandardMaterial({
-        color: 0x1a1a1a,
-        roughness: 0.9
+        color: isDark ? 0x0a0e1f : 0x8896b0,
+        roughness: 0.7,
+        metalness: isDark ? 0.3 : 0.1,
+        emissive: isDark ? 0x1e2744 : 0x000000,
+        emissiveIntensity: isDark ? 0.1 : 0
     });
     const road = new THREE.Mesh(roadGeometry, roadMaterial);
     road.rotation.x = -Math.PI / 2;
-    road.position.set(0, 0.01, -10);
+    road.position.set(0, 0.01, -40);
     road.receiveShadow = true;
     scene.add(road);
 
-    // Road lane markings
-    for (let z = 20; z > -80; z -= 8) {
-        const lineGeometry = new THREE.PlaneGeometry(0.5, 3);
+    // Road lane markings - electric cyan/neon (4x spacing and size)
+    for (let z = 80; z > -320; z -= 32) {
+        const lineGeometry = new THREE.PlaneGeometry(2, 12);
         const lineMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffff00,
-            emissive: 0xffff00,
-            emissiveIntensity: 0.2
+            color: isDark ? 0x00d4ff : 0x0099cc,
+            emissive: isDark ? 0x00d4ff : 0x00d4ff,
+            emissiveIntensity: isDark ? 0.8 : 0.3
         });
         const line = new THREE.Mesh(lineGeometry, lineMaterial);
         line.rotation.x = -Math.PI / 2;
@@ -456,40 +463,53 @@ function createRoadMarkings() {
 }
 
 function createSidewalks(isDark) {
-    const sidewalkColor = isDark ? 0x3a3a3a : 0x808080;
+    const sidewalkColor = isDark ? 0x1e2744 : 0xa8b5d1;
 
-    // Left sidewalk
+    // Left sidewalk (4x larger) - neon accented
     const leftSidewalk = new THREE.Mesh(
-        new THREE.PlaneGeometry(8, 180),
-        new THREE.MeshStandardMaterial({ color: sidewalkColor, roughness: 0.9 })
+        new THREE.PlaneGeometry(32, 720),
+        new THREE.MeshStandardMaterial({
+            color: sidewalkColor,
+            roughness: 0.8,
+            metalness: isDark ? 0.2 : 0.1,
+            emissive: isDark ? 0x2a3558 : 0x000000,
+            emissiveIntensity: isDark ? 0.1 : 0
+        })
     );
     leftSidewalk.rotation.x = -Math.PI / 2;
-    leftSidewalk.position.set(-10, 0.02, -10);
+    leftSidewalk.position.set(-40, 0.02, -40);
     leftSidewalk.receiveShadow = true;
     scene.add(leftSidewalk);
 
-    // Right sidewalk
+    // Right sidewalk (4x larger)
     const rightSidewalk = new THREE.Mesh(
-        new THREE.PlaneGeometry(8, 180),
-        new THREE.MeshStandardMaterial({ color: sidewalkColor, roughness: 0.9 })
+        new THREE.PlaneGeometry(32, 720),
+        new THREE.MeshStandardMaterial({
+            color: sidewalkColor,
+            roughness: 0.8,
+            metalness: isDark ? 0.2 : 0.1,
+            emissive: isDark ? 0x2a3558 : 0x000000,
+            emissiveIntensity: isDark ? 0.1 : 0
+        })
     );
     rightSidewalk.rotation.x = -Math.PI / 2;
-    rightSidewalk.position.set(10, 0.02, -10);
+    rightSidewalk.position.set(40, 0.02, -40);
     rightSidewalk.receiveShadow = true;
     scene.add(rightSidewalk);
 }
 
 function createCityBuildings(isDark) {
-    const buildingColor = isDark ? 0x2d2d3d : 0x6b7280;
-    const windowColor = isDark ? 0xffcc00 : 0x87ceeb;
+    const buildingColor = isDark ? 0x1a2340 : 0x8896b0;
+    const windowColor = isDark ? 0x00d4ff : 0x6b2bff; // Cyan / purple windows
 
+    // Building positions scaled 4x
     const buildingPositions = [
-        { x: -50, z: -20, w: 15, h: 25, d: 20 },
-        { x: -55, z: 10, w: 12, h: 30, d: 15 },
-        { x: -45, z: -50, w: 18, h: 20, d: 18 },
-        { x: 50, z: -20, w: 15, h: 28, d: 20 },
-        { x: 55, z: 10, w: 12, h: 22, d: 15 },
-        { x: 45, z: -50, w: 18, h: 35, d: 18 }
+        { x: -200, z: -80, w: 60, h: 25, d: 80 },
+        { x: -220, z: 40, w: 48, h: 30, d: 60 },
+        { x: -180, z: -200, w: 72, h: 20, d: 72 },
+        { x: 200, z: -80, w: 60, h: 28, d: 80 },
+        { x: 220, z: 40, w: 48, h: 22, d: 60 },
+        { x: 180, z: -200, w: 72, h: 35, d: 72 }
     ];
 
     buildingPositions.forEach(building => {
@@ -583,10 +603,10 @@ function createNPC(x, z, color) {
 function createNPCs() {
     const npcColors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6, 0x1abc9c];
 
-    // Create NPCs at various locations
+    // Create NPCs at various locations (4x scale)
     for (let i = 0; i < 15; i++) {
-        const x = (Math.random() - 0.5) * 60;
-        const z = -60 + Math.random() * 80;
+        const x = (Math.random() - 0.5) * 240;
+        const z = -240 + Math.random() * 320;
         const color = npcColors[Math.floor(Math.random() * npcColors.length)];
         createNPC(x, z, color);
     }
@@ -616,8 +636,8 @@ function updateNPCs() {
         npc.position.z += Math.cos(npc.userData.direction) * npc.userData.speed;
         npc.rotation.y = npc.userData.direction;
 
-        // Keep within bounds
-        const bounds = 40;
+        // Keep within bounds (4x scale)
+        const bounds = 160;
         if (Math.abs(npc.position.x) > bounds || Math.abs(npc.position.z) > bounds) {
             npc.userData.direction += Math.PI;
         }
@@ -627,13 +647,13 @@ function updateNPCs() {
             npc.userData.isPaused = true;
         }
 
-        // Avoid car
+        // Avoid car (4x scale)
         const distToCar = Math.sqrt(
             Math.pow(npc.position.x - car.position.x, 2) +
             Math.pow(npc.position.z - car.position.z, 2)
         );
 
-        if (distToCar < 5) {
+        if (distToCar < 20) {
             // Turn away from car
             const angleToCar = Math.atan2(
                 npc.position.x - car.position.x,
@@ -647,40 +667,42 @@ function updateNPCs() {
 function createSkillBuckets() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Create puddles with skill buckets
+    // Create puddles with skill buckets (4x scale) - cyberpunk colors
     const skillGroups = [
         {
             title: 'BACKEND',
             skills: ['Java 8', 'Spring Boot', 'Spring MVC', 'Gradle'],
-            x: 20,
-            z: -10,
-            color: 0x4a7ba7
+            x: 80,
+            z: -40,
+            color: 0x00d4ff // Electric cyan
         },
         {
             title: 'FRONTEND',
             skills: ['Angular 8', 'HTML/CSS', 'JavaScript', 'REST APIs'],
-            x: 20,
-            z: -25,
-            color: 0xe67e22
+            x: 80,
+            z: -100,
+            color: 0xff2e97 // Hot pink
         },
         {
             title: 'DATABASES & TOOLS',
             skills: ['MySQL', 'MongoDB', 'Git', 'Jenkins'],
-            x: 20,
-            z: -40,
-            color: 0x27ae60
+            x: 80,
+            z: -160,
+            color: 0x00ff88 // Neon green
         }
     ];
 
     skillGroups.forEach(group => {
-        // Create puddle/water feature (flat blue circle)
-        const puddleGeometry = new THREE.CircleGeometry(6, 32);
+        // Create puddle/water feature (4x scale) - neon glow
+        const puddleGeometry = new THREE.CircleGeometry(24, 32);
         const puddleMaterial = new THREE.MeshStandardMaterial({
-            color: isDark ? 0x1a3d5c : 0x5dade2,
-            roughness: 0.2,
-            metalness: 0.8,
+            color: group.color,
+            roughness: 0.1,
+            metalness: 0.9,
             transparent: true,
-            opacity: 0.7
+            opacity: isDark ? 0.6 : 0.5,
+            emissive: group.color,
+            emissiveIntensity: isDark ? 0.4 : 0.2
         });
         const puddle = new THREE.Mesh(puddleGeometry, puddleMaterial);
         puddle.rotation.x = -Math.PI / 2;
@@ -688,44 +710,50 @@ function createSkillBuckets() {
         puddle.receiveShadow = true;
         scene.add(puddle);
 
-        // Title sign above puddle
-        const titleBoard = createTextBoard(group.title, 8, 2, '#ffffff', '#2d2d2d', true);
-        titleBoard.position.set(group.x, 2, group.z + 8);
+        // Title sign above puddle (4x scale)
+        const titleBoard = createTextBoard(group.title, 32, 8, '#ffffff', '#2d2d2d', true);
+        titleBoard.position.set(group.x, 8, group.z + 32);
         scene.add(titleBoard);
 
-        // Support post for title
-        const postGeometry = new THREE.CylinderGeometry(0.15, 0.15, 2, 8);
-        const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
+        // Support post for title (4x scale) - neon style
+        const postGeometry = new THREE.CylinderGeometry(0.6, 0.6, 8, 8);
+        const postMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x6b2bff : 0x9d4edd,
+            roughness: 0.3,
+            metalness: 0.7,
+            emissive: isDark ? 0x6b2bff : 0x000000,
+            emissiveIntensity: isDark ? 0.2 : 0
+        });
         const post = new THREE.Mesh(postGeometry, postMaterial);
-        post.position.set(group.x, 1, group.z + 8);
+        post.position.set(group.x, 4, group.z + 32);
         post.castShadow = true;
         scene.add(post);
 
-        // Create skill buckets in and around the puddle
+        // Create skill buckets in and around the puddle (4x scale)
         group.skills.forEach((skill, idx) => {
             const angle = (idx / group.skills.length) * Math.PI * 2;
-            const radius = 3;
+            const radius = 12;
             const x = group.x + Math.cos(angle) * radius;
             const z = group.z + Math.sin(angle) * radius;
 
-            // Bucket
-            const bucketGeometry = new THREE.CylinderGeometry(0.8, 1, 2, 8);
+            // Bucket (4x scale)
+            const bucketGeometry = new THREE.CylinderGeometry(3.2, 4, 8, 8);
             const bucketMaterial = new THREE.MeshStandardMaterial({
                 color: group.color,
                 roughness: 0.5,
                 metalness: 0.3
             });
             const bucket = new THREE.Mesh(bucketGeometry, bucketMaterial);
-            bucket.position.set(x, 1, z);
+            bucket.position.set(x, 4, z);
             bucket.castShadow = true;
             bucket.receiveShadow = true;
             bucket.userData = { type: 'movable', mass: 1, isSkill: true, skillName: skill };
             scene.add(bucket);
             movableObjects.push(bucket);
 
-            // Label on bucket - make it zoomable
-            const labelBoard = createTextBoard(skill, 1.5, 1, `#${group.color.toString(16).padStart(6, '0')}`, '#ffffff', false, true);
-            labelBoard.position.set(x, 1, z + 1.2);
+            // Label on bucket - make it zoomable (4x scale)
+            const labelBoard = createTextBoard(skill, 6, 4, `#${group.color.toString(16).padStart(6, '0')}`, '#ffffff', false, true);
+            labelBoard.position.set(x, 4, z + 4.8);
             scene.add(labelBoard);
         });
     });
@@ -734,8 +762,8 @@ function createSkillBuckets() {
 function createCareerSteppingStones() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Create a stream (long water feature)
-    const streamGeometry = new THREE.PlaneGeometry(12, 40);
+    // Create a stream (4x scale)
+    const streamGeometry = new THREE.PlaneGeometry(48, 160);
     const streamMaterial = new THREE.MeshStandardMaterial({
         color: isDark ? 0x1a3d5c : 0x5dade2,
         roughness: 0.2,
@@ -745,57 +773,57 @@ function createCareerSteppingStones() {
     });
     const stream = new THREE.Mesh(streamGeometry, streamMaterial);
     stream.rotation.x = -Math.PI / 2;
-    stream.position.set(-25, 0.02, -15);
+    stream.position.set(-100, 0.02, -60);
     stream.receiveShadow = true;
     scene.add(stream);
 
-    // Title sign
-    const titleBoard = createTextBoard('CAREER JOURNEY', 10, 2.5, '#8b5a9e', '#ffffff', true);
-    titleBoard.position.set(-25, 3, 8);
+    // Title sign (4x scale)
+    const titleBoard = createTextBoard('CAREER JOURNEY', 40, 10, '#8b5a9e', '#ffffff', true);
+    titleBoard.position.set(-100, 12, 32);
     scene.add(titleBoard);
 
-    // Support post
-    const postGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 8);
+    // Support post (4x scale)
+    const postGeometry = new THREE.CylinderGeometry(0.8, 0.8, 12, 8);
     const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
     const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(-25, 1.5, 8);
+    post.position.set(-100, 6, 32);
     post.castShadow = true;
     scene.add(post);
 
-    // Job milestones as rideable mountains/hills
+    // Job milestones as rideable mountains/hills (4x scale)
     const jobs = [
-        { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', z: -5 },
-        { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', z: -15 },
-        { company: 'TCS', role: 'Systems Engineer', years: '2017-2019', z: -25 }
+        { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', z: -20 },
+        { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', z: -60 },
+        { company: 'TCS', role: 'Systems Engineer', years: '2017-2019', z: -100 }
     ];
 
     jobs.forEach((job, index) => {
-        const xOffset = (index % 2 === 0) ? -28 : -22;
+        const xOffset = (index % 2 === 0) ? -112 : -88;
 
-        // Create mountain/hill shape using multiple geometries
+        // Create mountain/hill shape using multiple geometries (4x scale)
         const mountainGroup = new THREE.Group();
 
         // Base - wide and flat for driving up
-        const baseGeometry = new THREE.CylinderGeometry(5, 6, 1, 16);
+        const baseGeometry = new THREE.CylinderGeometry(20, 24, 4, 16);
         const mountainMaterial = new THREE.MeshStandardMaterial({
             color: 0x8b7355,
             roughness: 0.9,
             metalness: 0.1
         });
         const base = new THREE.Mesh(baseGeometry, mountainMaterial);
-        base.position.y = 0.5;
+        base.position.y = 2;
         mountainGroup.add(base);
 
         // Mid section - sloping upward
-        const midGeometry = new THREE.CylinderGeometry(3.5, 5, 1.5, 16);
+        const midGeometry = new THREE.CylinderGeometry(14, 20, 6, 16);
         const mid = new THREE.Mesh(midGeometry, mountainMaterial);
-        mid.position.y = 1.75;
+        mid.position.y = 7;
         mountainGroup.add(mid);
 
         // Top section - peak
-        const topGeometry = new THREE.CylinderGeometry(2, 3.5, 1.2, 16);
+        const topGeometry = new THREE.CylinderGeometry(8, 14, 4.8, 16);
         const top = new THREE.Mesh(topGeometry, mountainMaterial);
-        top.position.y = 3.1;
+        top.position.y = 12.4;
         mountainGroup.add(top);
 
         // Add rocky texture with small bumps
@@ -808,78 +836,81 @@ function createCareerSteppingStones() {
         mountainGroup.userData = { type: 'rideable_mountain' };
         scene.add(mountainGroup);
 
-        // Info sign at the base of the mountain
-        const infoBoard = createTextBoard(`${job.company}\n${job.role}\n${job.years}`, 6, 3.5, '#d4c4b0', '#2d2d2d', true);
-        infoBoard.position.set(xOffset + 7, 2, job.z);
+        // Info sign at the base of the mountain (4x scale)
+        const infoBoard = createTextBoard(`${job.company}\n${job.role}\n${job.years}`, 24, 14, '#d4c4b0', '#2d2d2d', true);
+        infoBoard.position.set(xOffset + 28, 8, job.z);
         infoBoard.rotation.y = -Math.PI / 4;
         scene.add(infoBoard);
 
-        // Support post for sign
-        const signPostGeometry = new THREE.CylinderGeometry(0.15, 0.15, 2, 8);
+        // Support post for sign (4x scale)
+        const signPostGeometry = new THREE.CylinderGeometry(0.6, 0.6, 8, 8);
         const signPostMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
         const signPost = new THREE.Mesh(signPostGeometry, signPostMaterial);
-        signPost.position.set(xOffset + 7, 1, job.z);
+        signPost.position.set(xOffset + 28, 4, job.z);
         signPost.castShadow = true;
         scene.add(signPost);
     });
 }
 
 function createTrophyPodiums() {
-    // Trophy Podiums Area
-    const areaColor = 0xa87ab8;
+    // Trophy Podiums Area - cyberpunk purple
+    const areaColor = 0x9d4edd;
 
-    // Title sign
-    const titleBoard = createTextBoard('ACHIEVEMENT PLAZA', 12, 3, '#a87ab8', '#ffffff', true);
-    titleBoard.position.set(-25, 3, -38);
+    // Title sign (4x scale)
+    const titleBoard = createTextBoard('ACHIEVEMENT PLAZA', 48, 12, '#a87ab8', '#ffffff', true);
+    titleBoard.position.set(-100, 12, -152);
     scene.add(titleBoard);
 
-    // Support post
-    const postGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 8);
+    // Support post (4x scale)
+    const postGeometry = new THREE.CylinderGeometry(0.8, 0.8, 12, 8);
     const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
     const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(-25, 1.5, -38);
+    post.position.set(-100, 6, -152);
     post.castShadow = true;
     scene.add(post);
 
-    // Awards as trophies on podiums
+    // Awards as trophies on podiums (4x scale)
     const awards = [
-        { title: 'Tech Showcase', org: 'Morgan Stanley', year: '2023-24', x: -30, z: -48 },
-        { title: 'Pat on Back', org: 'TIAA', year: '2020', x: -25, z: -48 },
-        { title: 'On the Spot', org: 'TCS', year: '2018', x: -20, z: -48 },
-        { title: 'Arctic Vault', org: 'GitHub', year: '2020', x: -25, z: -54 }
+        { title: 'Tech Showcase', org: 'Morgan Stanley', year: '2023-24', x: -120, z: -192 },
+        { title: 'Pat on Back', org: 'TIAA', year: '2020', x: -100, z: -192 },
+        { title: 'On the Spot', org: 'TCS', year: '2018', x: -80, z: -192 },
+        { title: 'Arctic Vault', org: 'GitHub', year: '2020', x: -100, z: -216 }
     ];
 
     awards.forEach(award => {
-        // Tall podium (static)
-        const pedestalGeometry = new THREE.CylinderGeometry(1.5, 2, 3, 8);
+        // Tall podium (4x scale)
+        const pedestalGeometry = new THREE.CylinderGeometry(6, 8, 12, 8);
         const pedestalMaterial = new THREE.MeshStandardMaterial({
             color: areaColor,
             roughness: 0.5,
             metalness: 0.4
         });
         const pedestal = new THREE.Mesh(pedestalGeometry, pedestalMaterial);
-        pedestal.position.set(award.x, 1.5, award.z);
+        pedestal.position.set(award.x, 6, award.z);
         pedestal.castShadow = true;
         pedestal.receiveShadow = true;
         pedestal.userData = { type: 'static' };
         scene.add(pedestal);
         staticObjects.push(pedestal);
 
-        // Trophy (golden sphere on top)
-        const trophyGeometry = new THREE.SphereGeometry(0.7, 16, 16);
+        // Trophy (glowing neon sphere on top, 4x scale)
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const trophyGeometry = new THREE.SphereGeometry(2.8, 16, 16);
         const trophyMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffd700,
-            roughness: 0.3,
-            metalness: 0.8
+            color: isDark ? 0xff2e97 : 0xffd700, // Hot pink in dark / gold in light
+            roughness: 0.2,
+            metalness: 0.9,
+            emissive: isDark ? 0xff2e97 : 0xffcc00,
+            emissiveIntensity: isDark ? 0.5 : 0.3
         });
         const trophy = new THREE.Mesh(trophyGeometry, trophyMaterial);
-        trophy.position.set(award.x, 3.5, award.z);
+        trophy.position.set(award.x, 14, award.z);
         trophy.castShadow = true;
         scene.add(trophy);
 
-        // Plaque at base
-        const plaqueBoard = createTextBoard(`${award.title}\n${award.org}\n${award.year}`, 3, 2, '#ffffff', '#a87ab8', false, true);
-        plaqueBoard.position.set(award.x, 0.5, award.z + 2.5);
+        // Plaque at base (4x scale)
+        const plaqueBoard = createTextBoard(`${award.title}\n${award.org}\n${award.year}`, 12, 8, '#ffffff', '#a87ab8', false, true);
+        plaqueBoard.position.set(award.x, 2, award.z + 10);
         scene.add(plaqueBoard);
     });
 }
@@ -887,10 +918,10 @@ function createTrophyPodiums() {
 function createTechFlowerGarden() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Create a small flower garden for extra tech/tools
+    // Create a small flower garden for extra tech/tools (4x scale)
     const gardenPositions = [
-        { x: 10, z: 10 },
-        { x: -10, z: 10 }
+        { x: 40, z: 40 },
+        { x: -40, z: 40 }
     ];
 
     const flowers = ['Docker', 'Kubernetes', 'AWS', 'Microservices'];
@@ -898,38 +929,38 @@ function createTechFlowerGarden() {
     gardenPositions.forEach((pos, idx) => {
         flowers.forEach((flower, fIdx) => {
             const angle = (fIdx / flowers.length) * Math.PI * 2;
-            const radius = 3;
+            const radius = 12;
             const x = pos.x + Math.cos(angle) * radius;
             const z = pos.z + Math.sin(angle) * radius;
 
-            // Flower pot (movable)
-            const potGeometry = new THREE.CylinderGeometry(0.5, 0.7, 1.2, 8);
+            // Flower pot (movable, 4x scale)
+            const potGeometry = new THREE.CylinderGeometry(2, 2.8, 4.8, 8);
             const potMaterial = new THREE.MeshStandardMaterial({
                 color: 0xd2691e,
                 roughness: 0.8
             });
             const pot = new THREE.Mesh(potGeometry, potMaterial);
-            pot.position.set(x, 0.6, z);
+            pot.position.set(x, 2.4, z);
             pot.castShadow = true;
             pot.receiveShadow = true;
             pot.userData = { type: 'movable', mass: 0.8, isSkill: true, skillName: flower };
             scene.add(pot);
             movableObjects.push(pot);
 
-            // Flower on top
-            const flowerGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+            // Flower on top (4x scale)
+            const flowerGeometry = new THREE.SphereGeometry(1.6, 8, 8);
             const flowerMaterial = new THREE.MeshStandardMaterial({
                 color: [0xff69b4, 0xffa500, 0xff6347, 0x9370db][fIdx % 4],
                 roughness: 0.6
             });
             const flowerTop = new THREE.Mesh(flowerGeometry, flowerMaterial);
-            flowerTop.position.set(x, 1.6, z);
+            flowerTop.position.set(x, 6.4, z);
             flowerTop.castShadow = true;
             scene.add(flowerTop);
 
-            // Label
-            const labelBoard = createTextBoard(flower, 1.5, 0.8, '#ffffff', '#2d2d2d', false, true);
-            labelBoard.position.set(x, 0.6, z + 0.9);
+            // Label (4x scale)
+            const labelBoard = createTextBoard(flower, 6, 3.2, '#ffffff', '#2d2d2d', false, true);
+            labelBoard.position.set(x, 2.4, z + 3.6);
             scene.add(labelBoard);
         });
     });
@@ -938,8 +969,8 @@ function createTechFlowerGarden() {
 function createContactLilyPond() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Create lily pond (circular water feature)
-    const pondGeometry = new THREE.CircleGeometry(10, 32);
+    // Create lily pond (4x scale)
+    const pondGeometry = new THREE.CircleGeometry(40, 32);
     const pondMaterial = new THREE.MeshStandardMaterial({
         color: isDark ? 0x1a3d5c : 0x5dade2,
         roughness: 0.2,
@@ -949,39 +980,39 @@ function createContactLilyPond() {
     });
     const pond = new THREE.Mesh(pondGeometry, pondMaterial);
     pond.rotation.x = -Math.PI / 2;
-    pond.position.set(0, 0.02, -55);
+    pond.position.set(0, 0.02, -220);
     pond.receiveShadow = true;
     scene.add(pond);
 
-    // Title sign
-    const titleBoard = createTextBoard('WELCOME & CONTACT', 12, 3, '#5a3d54', '#ffffff', true);
-    titleBoard.position.set(0, 3, -40);
+    // Title sign (4x scale)
+    const titleBoard = createTextBoard('WELCOME & CONTACT', 48, 12, '#5a3d54', '#ffffff', true);
+    titleBoard.position.set(0, 12, -160);
     scene.add(titleBoard);
 
-    // Support post
-    const postGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 8);
+    // Support post (4x scale)
+    const postGeometry = new THREE.CylinderGeometry(0.8, 0.8, 12, 8);
     const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
     const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(0, 1.5, -40);
+    post.position.set(0, 6, -160);
     post.castShadow = true;
     scene.add(post);
 
-    // Main info lily pad (center)
-    const mainLilyGeometry = new THREE.CylinderGeometry(3, 3, 0.3, 8);
+    // Main info lily pad (4x scale)
+    const mainLilyGeometry = new THREE.CylinderGeometry(12, 12, 1.2, 8);
     const mainLilyMaterial = new THREE.MeshStandardMaterial({
         color: 0x90ee90,
         roughness: 0.7
     });
     const mainLily = new THREE.Mesh(mainLilyGeometry, mainLilyMaterial);
-    mainLily.position.set(0, 0.15, -55);
+    mainLily.position.set(0, 0.6, -220);
     mainLily.castShadow = true;
     mainLily.receiveShadow = true;
     scene.add(mainLily);
 
-    // Main info on lily pad - make it zoomable
-    const mainBoard = createTextBoard('Divij Shrivastava\nSoftware Engineer\n8 Years Experience', 5, 3, '#e8f5e9', '#2d2d2d', false, true);
+    // Main info on lily pad - make it zoomable (4x scale)
+    const mainBoard = createTextBoard('Divij Shrivastava\nSoftware Engineer\n8 Years Experience', 20, 12, '#e8f5e9', '#2d2d2d', false, true);
     mainBoard.rotation.x = -Math.PI / 2;
-    mainBoard.position.set(0, 0.31, -55);
+    mainBoard.position.set(0, 1.24, -220);
     scene.add(mainBoard);
 
     // Contact lily pads around the main one
@@ -992,65 +1023,65 @@ function createContactLilyPond() {
     ];
 
     contactInfo.forEach(info => {
-        const radius = 6;
+        const radius = 24;
         const x = Math.cos(info.angle) * radius;
-        const z = -55 + Math.sin(info.angle) * radius;
+        const z = -220 + Math.sin(info.angle) * radius;
 
-        // Lily pad
-        const lilyGeometry = new THREE.CylinderGeometry(2, 2, 0.3, 8);
+        // Lily pad (4x scale)
+        const lilyGeometry = new THREE.CylinderGeometry(8, 8, 1.2, 8);
         const lilyMaterial = new THREE.MeshStandardMaterial({
             color: 0x90ee90,
             roughness: 0.7
         });
         const lily = new THREE.Mesh(lilyGeometry, lilyMaterial);
-        lily.position.set(x, 0.15, z);
+        lily.position.set(x, 0.6, z);
         lily.castShadow = true;
         lily.receiveShadow = true;
         scene.add(lily);
 
-        // Contact info on lily pad - make it zoomable
-        const contactBoard = createTextBoard(info.text, 3.5, 2, '#e8f5e9', '#2d2d2d', false, true);
+        // Contact info on lily pad - make it zoomable (4x scale)
+        const contactBoard = createTextBoard(info.text, 14, 8, '#e8f5e9', '#2d2d2d', false, true);
         contactBoard.rotation.x = -Math.PI / 2;
-        contactBoard.position.set(x, 0.31, z);
+        contactBoard.position.set(x, 1.24, z);
         scene.add(contactBoard);
     });
 
-    // Education lily pad
-    const eduLilyGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.3, 8);
+    // Education lily pad (4x scale)
+    const eduLilyGeometry = new THREE.CylinderGeometry(10, 10, 1.2, 8);
     const eduLilyMaterial = new THREE.MeshStandardMaterial({
         color: 0x90ee90,
         roughness: 0.7
     });
     const eduLily = new THREE.Mesh(eduLilyGeometry, eduLilyMaterial);
-    eduLily.position.set(0, 0.15, -63);
+    eduLily.position.set(0, 0.6, -252);
     eduLily.castShadow = true;
     eduLily.receiveShadow = true;
     scene.add(eduLily);
 
-    const eduBoard = createTextBoard('Education:\nB.E. Computer\nSRIT Jabalpur\n2012-2016', 4, 3, '#e8f5e9', '#2d2d2d', false, true);
+    const eduBoard = createTextBoard('Education:\nB.E. Computer\nSRIT Jabalpur\n2012-2016', 16, 12, '#e8f5e9', '#2d2d2d', false, true);
     eduBoard.rotation.x = -Math.PI / 2;
-    eduBoard.position.set(0, 0.31, -63);
+    eduBoard.position.set(0, 1.24, -252);
     scene.add(eduBoard);
 }
 
 function createInteractiveObjects() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Barrels scattered around
+    // Barrels scattered around (4x scale)
     const barrelPositions = [
-        { x: 5, z: -5 }, { x: -5, z: -5 }, { x: 12, z: -12 },
-        { x: -12, z: -12 }, { x: 8, z: -30 }, { x: -8, z: -30 }
+        { x: 20, z: -20 }, { x: -20, z: -20 }, { x: 48, z: -48 },
+        { x: -48, z: -48 }, { x: 32, z: -120 }, { x: -32, z: -120 }
     ];
 
     barrelPositions.forEach(pos => {
-        const barrelGeometry = new THREE.CylinderGeometry(0.8, 0.8, 1.8, 12);
+        const barrelGeometry = new THREE.CylinderGeometry(3.2, 3.2, 7.2, 12);
         const barrelMaterial = new THREE.MeshStandardMaterial({
             color: 0x8b4513,
             roughness: 0.8,
             metalness: 0.2
         });
         const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
-        barrel.position.set(pos.x, 0.9, pos.z);
+        barrel.position.set(pos.x, 3.6, pos.z);
         barrel.castShadow = true;
         barrel.receiveShadow = true;
         barrel.userData = { type: 'movable', mass: 2 };
@@ -1058,20 +1089,20 @@ function createInteractiveObjects() {
         movableObjects.push(barrel);
     });
 
-    // Traffic cones
+    // Traffic cones (4x scale)
     const conePositions = [
-        { x: 0, z: 5 }, { x: 3, z: 0 }, { x: -3, z: 0 },
-        { x: 15, z: -20 }, { x: -15, z: -20 }
+        { x: 0, z: 20 }, { x: 12, z: 0 }, { x: -12, z: 0 },
+        { x: 60, z: -80 }, { x: -60, z: -80 }
     ];
 
     conePositions.forEach(pos => {
-        const coneGeometry = new THREE.ConeGeometry(0.5, 1.5, 8);
+        const coneGeometry = new THREE.ConeGeometry(2, 6, 8);
         const coneMaterial = new THREE.MeshStandardMaterial({
             color: 0xff6600,
             roughness: 0.6
         });
         const cone = new THREE.Mesh(coneGeometry, coneMaterial);
-        cone.position.set(pos.x, 0.75, pos.z);
+        cone.position.set(pos.x, 3, pos.z);
         cone.castShadow = true;
         cone.receiveShadow = true;
         cone.userData = { type: 'movable', mass: 0.5 };
@@ -1079,44 +1110,44 @@ function createInteractiveObjects() {
         movableObjects.push(cone);
     });
 
-    // Benches (static obstacles)
+    // Benches (static obstacles, 4x scale)
     const benchPositions = [
-        { x: 15, z: 5, rotation: Math.PI / 4 },
-        { x: -15, z: 5, rotation: -Math.PI / 4 }
+        { x: 60, z: 20, rotation: Math.PI / 4 },
+        { x: -60, z: 20, rotation: -Math.PI / 4 }
     ];
 
     benchPositions.forEach(pos => {
         const benchGroup = new THREE.Group();
 
-        // Bench seat
-        const seatGeometry = new THREE.BoxGeometry(3, 0.3, 1);
+        // Bench seat (4x scale)
+        const seatGeometry = new THREE.BoxGeometry(12, 1.2, 4);
         const seatMaterial = new THREE.MeshStandardMaterial({
             color: 0x8b4513,
             roughness: 0.7
         });
         const seat = new THREE.Mesh(seatGeometry, seatMaterial);
-        seat.position.set(0, 0.8, 0);
+        seat.position.set(0, 3.2, 0);
         seat.castShadow = true;
         seat.receiveShadow = true;
         benchGroup.add(seat);
 
-        // Bench back
-        const backGeometry = new THREE.BoxGeometry(3, 1, 0.2);
+        // Bench back (4x scale)
+        const backGeometry = new THREE.BoxGeometry(12, 4, 0.8);
         const back = new THREE.Mesh(backGeometry, seatMaterial);
-        back.position.set(0, 1.2, -0.4);
+        back.position.set(0, 4.8, -1.6);
         back.castShadow = true;
         benchGroup.add(back);
 
-        // Legs
-        [-1, 1].forEach(xOffset => {
-            const legGeometry = new THREE.BoxGeometry(0.2, 0.8, 0.2);
+        // Legs (4x scale)
+        [-4, 4].forEach(xOffset => {
+            const legGeometry = new THREE.BoxGeometry(0.8, 3.2, 0.8);
             const leg = new THREE.Mesh(legGeometry, seatMaterial);
-            leg.position.set(xOffset, 0.4, 0.3);
+            leg.position.set(xOffset, 1.6, 1.2);
             leg.castShadow = true;
             benchGroup.add(leg);
 
             const leg2 = new THREE.Mesh(legGeometry, seatMaterial);
-            leg2.position.set(xOffset, 0.4, -0.3);
+            leg2.position.set(xOffset, 1.6, -1.2);
             leg2.castShadow = true;
             benchGroup.add(leg2);
         });
@@ -1131,13 +1162,16 @@ function createInteractiveObjects() {
 
 function createCar() {
     car = new THREE.Group();
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Car body
+    // Car body - cyberpunk neon style
     const bodyGeometry = new THREE.BoxGeometry(2, 0.8, 4);
     const bodyMaterial = new THREE.MeshStandardMaterial({
-        color: 0x8b5a9e,
-        roughness: 0.3,
-        metalness: 0.6
+        color: isDark ? 0x00d4ff : 0x0099cc, // Electric cyan
+        roughness: 0.2,
+        metalness: 0.8,
+        emissive: isDark ? 0x00d4ff : 0x000000,
+        emissiveIntensity: isDark ? 0.3 : 0
     });
     carBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
     carBody.position.y = 0.8;
@@ -1145,12 +1179,14 @@ function createCar() {
     carBody.receiveShadow = true;
     car.add(carBody);
 
-    // Car top/cabin
+    // Car top/cabin - purple accent
     const cabinGeometry = new THREE.BoxGeometry(1.6, 0.6, 2.2);
     const cabinMaterial = new THREE.MeshStandardMaterial({
-        color: 0x6d4579,
-        roughness: 0.3,
-        metalness: 0.6
+        color: isDark ? 0x6b2bff : 0x9d4edd, // Vivid purple
+        roughness: 0.2,
+        metalness: 0.7,
+        emissive: isDark ? 0x6b2bff : 0x000000,
+        emissiveIntensity: isDark ? 0.2 : 0
     });
     const cabin = new THREE.Mesh(cabinGeometry, cabinMaterial);
     cabin.position.set(0, 1.4, -0.3);
@@ -1179,87 +1215,87 @@ function createCar() {
         car.add(wheel);
     });
 
-    // Position car at start
-    car.position.set(0, 0, 15);
+    // Position car at start (4x scale)
+    car.position.set(0, 0, 60);
     scene.add(car);
 }
 
 function createEnvironment() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Trees scattered around the edges (static obstacles)
+    // Trees scattered around the edges (4x scale)
     const treePositions = [
-        { x: -35, z: 10 }, { x: -35, z: -10 }, { x: -35, z: -30 }, { x: -35, z: -50 },
-        { x: 35, z: 10 }, { x: 35, z: -10 }, { x: 35, z: -30 }, { x: 35, z: -50 },
-        { x: -10, z: 18 }, { x: 10, z: 18 }, { x: 0, z: -70 },
+        { x: -140, z: 40 }, { x: -140, z: -40 }, { x: -140, z: -120 }, { x: -140, z: -200 },
+        { x: 140, z: 40 }, { x: 140, z: -40 }, { x: 140, z: -120 }, { x: 140, z: -200 },
+        { x: -40, z: 72 }, { x: 40, z: 72 }, { x: 0, z: -280 },
         // Add more trees for better boundaries
-        { x: -18, z: -35 }, { x: 18, z: -35 }
+        { x: -72, z: -140 }, { x: 72, z: -140 }
     ];
 
     treePositions.forEach(pos => {
         const treeGroup = new THREE.Group();
 
-        // Tree trunk
-        const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.6, 4, 8);
+        // Tree trunk (4x scale)
+        const trunkGeometry = new THREE.CylinderGeometry(2, 2.4, 16, 8);
         const trunkMaterial = new THREE.MeshStandardMaterial({
             color: isDark ? 0x4a3428 : 0x6b4423,
             roughness: 0.9
         });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        trunk.position.set(0, 2, 0);
+        trunk.position.set(0, 8, 0);
         trunk.castShadow = true;
         trunk.receiveShadow = true;
         treeGroup.add(trunk);
 
-        // Tree foliage
-        const foliageGeometry = new THREE.SphereGeometry(2.5, 8, 8);
+        // Tree foliage (4x scale)
+        const foliageGeometry = new THREE.SphereGeometry(10, 8, 8);
         const foliageMaterial = new THREE.MeshStandardMaterial({
             color: isDark ? 0x2d5a2d : 0x4a9d4a,
             roughness: 0.8
         });
         const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
-        foliage.position.set(0, 5, 0);
+        foliage.position.set(0, 20, 0);
         foliage.castShadow = true;
         foliage.receiveShadow = true;
         treeGroup.add(foliage);
 
         treeGroup.position.set(pos.x, 0, pos.z);
-        treeGroup.userData = { type: 'static', radius: 3 };
+        treeGroup.userData = { type: 'static', radius: 12 };
         scene.add(treeGroup);
         staticObjects.push(treeGroup);
     });
 
-    // Decorative rocks (static)
+    // Decorative rocks (4x scale)
     const rockPositions = [
-        { x: 8, z: -48 }, { x: -8, z: -48 }, { x: 12, z: -55 }
+        { x: 32, z: -192 }, { x: -32, z: -192 }, { x: 48, z: -220 }
     ];
 
     rockPositions.forEach(pos => {
-        const rockGeometry = new THREE.DodecahedronGeometry(1.2, 0);
+        const rockGeometry = new THREE.DodecahedronGeometry(4.8, 0);
         const rockMaterial = new THREE.MeshStandardMaterial({
             color: 0x808080,
             roughness: 0.9,
             metalness: 0.1
         });
         const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-        rock.position.set(pos.x, 0.6, pos.z);
+        rock.position.set(pos.x, 2.4, pos.z);
         rock.rotation.set(Math.random(), Math.random(), Math.random());
         rock.castShadow = true;
         rock.receiveShadow = true;
-        rock.userData = { type: 'static', radius: 1.5 };
+        rock.userData = { type: 'static', radius: 6 };
         scene.add(rock);
         staticObjects.push(rock);
     });
 
-    // Path markers
-    for (let z = 10; z > -70; z -= 8) {
-        const markerGeometry = new THREE.BoxGeometry(2, 0.1, 2);
+    // Path markers (4x scale)
+    for (let z = 40; z > -280; z -= 32) {
+        const markerGeometry = new THREE.BoxGeometry(8, 0.4, 8);
         const markerMaterial = new THREE.MeshStandardMaterial({
             color: isDark ? 0x444444 : 0xcccccc,
             roughness: 0.8
         });
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        marker.position.set(0, 0.06, z);
+        marker.position.set(0, 0.24, z);
         marker.receiveShadow = true;
         scene.add(marker);
     }
@@ -1332,8 +1368,8 @@ function updateZoomBubble() {
         }
     });
 
-    // Show bubble if within range
-    if (nearestBillboard && nearestDistance < 15) {
+    // Show bubble if within range (4x scale)
+    if (nearestBillboard && nearestDistance < 60) {
         showProximityBubble(nearestBillboard);
     } else {
         hideBubble();
@@ -1368,7 +1404,7 @@ function hideBubble() {
 }
 
 function zoomToNearestBillboard() {
-    if (!nearestBillboard || nearestDistance >= 15) {
+    if (!nearestBillboard || nearestDistance >= 60) {
         return;
     }
 
@@ -1417,10 +1453,10 @@ function toggleTheme() {
     htmlElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
 
-    // Update scene colors
+    // Update scene colors - cyberpunk theme
     const isDark = newTheme === 'dark';
-    scene.background = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
-    scene.fog.color = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
+    scene.background = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff);
+    scene.fog.color = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff);
 
     // Update ground to grass color
     scene.children.forEach(child => {
@@ -1587,14 +1623,14 @@ function updateCar() {
             const distZ = car.position.z - child.position.z;
             const dist2D = Math.sqrt(distX * distX + distZ * distZ);
 
-            // Check if car is over the mountain (within radius)
-            if (dist2D < 6) { // Base radius of mountain
+            // Check if car is over the mountain (4x scale)
+            if (dist2D < 24) { // Base radius of mountain (4x)
                 onMountain = true;
 
                 // Calculate height based on distance from center
-                // Mountains are roughly 3.7 units tall at center
-                const heightFactor = Math.max(0, 1 - dist2D / 6);
-                const mountainHeight = 3.7 * heightFactor;
+                // Mountains are roughly 14.8 units tall at center (4x)
+                const heightFactor = Math.max(0, 1 - dist2D / 24);
+                const mountainHeight = 14.8 * heightFactor;
                 targetY = Math.max(targetY, mountainHeight);
 
                 // Calculate slope for car tilting
@@ -1627,8 +1663,8 @@ function updateCar() {
     car.rotation.x = car.userData.tiltX;
     car.rotation.z = car.userData.tiltZ;
 
-    // Keep car within bounds
-    const maxDist = 90;
+    // Keep car within bounds (4x scale)
+    const maxDist = 360;
     car.position.x = Math.max(-maxDist, Math.min(maxDist, car.position.x));
     car.position.z = Math.max(-maxDist, Math.min(maxDist, car.position.z));
 
