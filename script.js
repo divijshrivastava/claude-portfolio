@@ -14,6 +14,15 @@ const acceleration = 0.01;
 const deceleration = 0.005;
 const turnSpeed = 0.03;
 
+// Camera control variables
+let cameraAngle = Math.PI / 3; // Initial angle (60 degrees from horizontal)
+const minCameraAngle = Math.PI / 6; // 30 degrees (lower, more behind view)
+const maxCameraAngle = Math.PI / 2.2; // ~80 degrees (higher, more top-down)
+const cameraDistance = 25;
+
+// Mute state
+let isMuted = false;
+
 // Interactive objects arrays
 let movableObjects = [];
 let staticObjects = [];
@@ -154,7 +163,7 @@ function createEngineSound() {
 }
 
 function playCollisionSound(intensity = 1) {
-    if (!audioContext) return;
+    if (!audioContext || isMuted) return;
 
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -172,7 +181,7 @@ function playCollisionSound(intensity = 1) {
 }
 
 function playObjectHitSound() {
-    if (!audioContext) return;
+    if (!audioContext || isMuted) return;
 
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -190,7 +199,7 @@ function playObjectHitSound() {
 }
 
 function updateEngineSound(speed) {
-    if (!audioContext || !engineSound) return;
+    if (!audioContext || !engineSound || isMuted) return;
 
     const absSpeed = Math.abs(speed);
 
@@ -900,6 +909,34 @@ function toggleTheme() {
     });
 }
 
+function toggleMute() {
+    isMuted = !isMuted;
+    localStorage.setItem('soundMuted', isMuted);
+
+    const muteButton = document.getElementById('muteToggle');
+    if (isMuted) {
+        muteButton.classList.add('muted');
+        if (engineGainNode) {
+            engineGainNode.gain.value = 0;
+        }
+    } else {
+        muteButton.classList.remove('muted');
+    }
+}
+
+function playEngineSound() {
+    if (!isMuted && audioContext) {
+        isEngineRunning = true;
+    }
+}
+
+function stopEngineSound() {
+    isEngineRunning = false;
+    if (engineGainNode) {
+        engineGainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+    }
+}
+
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -934,11 +971,6 @@ function updateCar() {
         if (Math.abs(carSpeed) < 0.01 && isEngineRunning) {
             stopEngineSound();
         }
-    }
-
-    // Update engine sound
-    if (isEngineRunning) {
-        updateEngineSound(carSpeed);
     }
 
     // Turning (only when moving)
@@ -1016,67 +1048,6 @@ function updateCar() {
     }
 
     car.rotation.y = carRotation;
-
-    // Collision detection with solid objects (trees and interactive objects)
-    let collision = false;
-    const carBoundingBox = new THREE.Box3().setFromObject(car);
-
-    solidObjects.forEach(obj => {
-        const objBoundingBox = new THREE.Box3().setFromObject(obj);
-        if (carBoundingBox.intersectsBox(objBoundingBox)) {
-            collision = true;
-            // Revert position
-            car.position.x = oldX;
-            car.position.z = oldZ;
-            carSpeed *= -0.3; // Bounce back
-            playCollisionSound();
-        }
-    });
-
-    // Check collisions with movable objects
-    movableObjects.forEach(movObj => {
-        const objBoundingBox = new THREE.Box3().setFromObject(movObj.mesh);
-        if (carBoundingBox.intersectsBox(objBoundingBox)) {
-            // Calculate push direction
-            const pushDir = new THREE.Vector3(
-                movObj.mesh.position.x - car.position.x,
-                0,
-                movObj.mesh.position.z - car.position.z
-            ).normalize();
-
-            // Apply force to movable object
-            const force = Math.abs(carSpeed) * 2;
-            movObj.velocity.add(pushDir.multiplyScalar(force));
-
-            playCollisionSound();
-            carSpeed *= 0.7; // Slow down car
-        }
-    });
-
-    // Update movable objects physics
-    movableObjects.forEach(movObj => {
-        // Apply velocity
-        movObj.mesh.position.add(movObj.velocity);
-
-        // Apply friction
-        movObj.velocity.multiplyScalar(0.92);
-
-        // Keep within bounds
-        const maxDist = 85;
-        if (Math.abs(movObj.mesh.position.x) > maxDist) {
-            movObj.mesh.position.x = Math.sign(movObj.mesh.position.x) * maxDist;
-            movObj.velocity.x *= -0.5;
-        }
-        if (Math.abs(movObj.mesh.position.z) > maxDist) {
-            movObj.mesh.position.z = Math.sign(movObj.mesh.position.z) * maxDist;
-            movObj.velocity.z *= -0.5;
-        }
-
-        // Stop if velocity is very small
-        if (movObj.velocity.length() < 0.01) {
-            movObj.velocity.set(0, 0, 0);
-        }
-    });
 
     // Keep car within bounds
     const maxDist = 90;
