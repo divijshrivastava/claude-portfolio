@@ -32,11 +32,8 @@ let soundsLoaded = false;
 let points = 0;
 let collectedSkills = new Set();
 
-// Billboard tracking for zoom
+// Billboard tracking (zoom functionality removed)
 let billboards = [];
-let isZoomed = false;
-let nearestBillboard = null;
-let nearestDistance = Infinity;
 
 // NPCs and Traffic
 let npcs = [];
@@ -334,7 +331,7 @@ function collectSkill(skillObj) {
     return true;
 }
 
-function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d', isBillboard = false, isZoomable = false) {
+function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d', isBillboard = false) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 2048;  // Increased for better quality
@@ -396,14 +393,6 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
     const board = new THREE.Mesh(geometry, material);
     board.castShadow = true;
     board.receiveShadow = true;
-
-    // Store data for zoom functionality
-    if (isBillboard || isZoomable) {
-        board.userData.isZoomable = true;
-        board.userData.zoomText = text;
-        board.userData.zoomTitle = lines[0];
-        billboards.push(board);
-    }
 
     return board;
 }
@@ -901,8 +890,8 @@ function createSkillBuckets() {
             scene.add(bucket);
             movableObjects.push(bucket);
 
-            // Label on bucket - make it zoomable (4x scale)
-            const labelBoard = createTextBoard(skill, 6, 4, `#${group.color.toString(16).padStart(6, '0')}`, '#ffffff', false, true);
+            // Label on bucket (4x scale)
+            const labelBoard = createTextBoard(skill, 6, 4, `#${group.color.toString(16).padStart(6, '0')}`, '#ffffff', false);
             labelBoard.position.set(x, 4, z + 4.8);
             scene.add(labelBoard);
         });
@@ -1059,7 +1048,7 @@ function createTrophyPodiums() {
         scene.add(trophy);
 
         // Plaque at base (4x scale)
-        const plaqueBoard = createTextBoard(`${award.title}\n${award.org}\n${award.year}`, 12, 8, '#ffffff', '#a87ab8', false, true);
+        const plaqueBoard = createTextBoard(`${award.title}\n${award.org}\n${award.year}`, 12, 8, '#ffffff', '#a87ab8', false);
         plaqueBoard.position.set(award.x, 2, award.z + 10);
         scene.add(plaqueBoard);
     });
@@ -1109,7 +1098,7 @@ function createTechFlowerGarden() {
             scene.add(flowerTop);
 
             // Label (4x scale)
-            const labelBoard = createTextBoard(flower, 6, 3.2, '#ffffff', '#2d2d2d', false, true);
+            const labelBoard = createTextBoard(flower, 6, 3.2, '#ffffff', '#2d2d2d', false);
             labelBoard.position.set(x, 2.4, z + 3.6);
             scene.add(labelBoard);
         });
@@ -1159,8 +1148,8 @@ function createContactLilyPond() {
     mainLily.receiveShadow = true;
     scene.add(mainLily);
 
-    // Main info on lily pad - make it zoomable (4x scale)
-    const mainBoard = createTextBoard('Divij Shrivastava\nSoftware Engineer\n8 Years Experience', 20, 12, '#e8f5e9', '#2d2d2d', false, true);
+    // Main info on lily pad (4x scale)
+    const mainBoard = createTextBoard('Divij Shrivastava\nSoftware Engineer\n8 Years Experience', 20, 12, '#e8f5e9', '#2d2d2d', false);
     mainBoard.rotation.x = -Math.PI / 2;
     mainBoard.position.set(0, 1.24, -220);
     scene.add(mainBoard);
@@ -1189,8 +1178,8 @@ function createContactLilyPond() {
         lily.receiveShadow = true;
         scene.add(lily);
 
-        // Contact info on lily pad - make it zoomable (4x scale)
-        const contactBoard = createTextBoard(info.text, 14, 8, '#e8f5e9', '#2d2d2d', false, true);
+        // Contact info on lily pad (4x scale)
+        const contactBoard = createTextBoard(info.text, 14, 8, '#e8f5e9', '#2d2d2d', false);
         contactBoard.rotation.x = -Math.PI / 2;
         contactBoard.position.set(x, 1.24, z);
         scene.add(contactBoard);
@@ -1208,7 +1197,7 @@ function createContactLilyPond() {
     eduLily.receiveShadow = true;
     scene.add(eduLily);
 
-    const eduBoard = createTextBoard('Education:\nB.E. Computer\nSRIT Jabalpur\n2012-2016', 16, 12, '#e8f5e9', '#2d2d2d', false, true);
+    const eduBoard = createTextBoard('Education:\nB.E. Computer\nSRIT Jabalpur\n2012-2016', 16, 12, '#e8f5e9', '#2d2d2d', false);
     eduBoard.rotation.x = -Math.PI / 2;
     eduBoard.position.set(0, 1.24, -252);
     scene.add(eduBoard);
@@ -1455,20 +1444,6 @@ function addEventListeners() {
     // Keyboard controls
     document.addEventListener('keydown', (e) => {
         keysPressed[e.code] = true;
-
-        // Zoom functionality (toggle)
-        if (e.code === 'KeyZ') {
-            if (isZoomed) {
-                closeZoom();
-            } else {
-                zoomToNearestBillboard();
-            }
-        }
-
-        // Close zoom with ESC
-        if (e.code === 'Escape' && isZoomed) {
-            closeZoom();
-        }
     });
 
     document.addEventListener('keyup', (e) => {
@@ -1500,100 +1475,7 @@ function addEventListeners() {
     window.addEventListener('resize', onWindowResize);
 }
 
-function updateZoomBubble() {
-    if (billboards.length === 0 || isZoomed) {
-        hideBubble();
-        return;
-    }
-
-    // Find nearest billboard
-    nearestBillboard = null;
-    nearestDistance = Infinity;
-
-    billboards.forEach(billboard => {
-        const distance = car.position.distanceTo(billboard.position);
-        if (distance < nearestDistance) {
-            nearestDistance = distance;
-            nearestBillboard = billboard;
-        }
-    });
-
-    // Show bubble if within range (4x scale)
-    if (nearestBillboard && nearestDistance < 60) {
-        showProximityBubble(nearestBillboard);
-    } else {
-        hideBubble();
-    }
-}
-
-function showProximityBubble(billboard) {
-    const bubble = document.getElementById('zoomBubble');
-    const bubbleText = document.querySelector('.zoom-bubble-text');
-
-    // Get screen position
-    const vector = new THREE.Vector3();
-    billboard.getWorldPosition(vector);
-    vector.project(camera);
-
-    const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
-    const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
-
-    bubble.style.left = screenX + 'px';
-    bubble.style.top = screenY + 'px';
-    bubble.style.transform = 'translate(-50%, -50%)';
-
-    bubbleText.textContent = 'Press Z to view';
-
-    bubble.classList.add('visible', 'small');
-    bubble.classList.remove('expanding');
-}
-
-function hideBubble() {
-    const bubble = document.getElementById('zoomBubble');
-    bubble.classList.remove('visible', 'small', 'expanding');
-}
-
-function zoomToNearestBillboard() {
-    if (!nearestBillboard || nearestDistance >= 60) {
-        return;
-    }
-
-    // Expand the bubble and show content
-    const bubble = document.getElementById('zoomBubble');
-    const bubbleText = document.querySelector('.zoom-bubble-text');
-
-    isZoomed = true;
-
-    // Center the bubble
-    bubble.style.left = '50%';
-    bubble.style.top = '50%';
-    bubble.style.transform = 'translate(-50%, -50%)';
-
-    // Format text
-    const text = nearestBillboard.userData.zoomText || nearestBillboard.userData.billboardText;
-    const formattedText = text.split('\n').map((line, index) => {
-        if (index === 0) {
-            return `<strong>${line}</strong>`;
-        }
-        return line;
-    }).join('<br>');
-
-    // Expand animation
-    bubble.classList.remove('small');
-    bubble.classList.add('expanding');
-
-    // Update text after a brief delay for smooth animation
-    setTimeout(() => {
-        bubbleText.innerHTML = formattedText;
-    }, 150);
-}
-
-function closeZoom() {
-    isZoomed = false;
-    hideBubble();
-    // Update bubble immediately to show "Press Z" again if still in range
-    setTimeout(() => updateZoomBubble(), 100);
-}
+// Zoom functionality removed
 
 function toggleTheme() {
     const htmlElement = document.documentElement;
@@ -1869,9 +1751,6 @@ function animate() {
             }
         }
     });
-
-    // Update zoom bubble position and visibility
-    updateZoomBubble();
 
     renderer.render(scene, camera);
 }
