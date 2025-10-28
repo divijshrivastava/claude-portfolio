@@ -328,39 +328,62 @@ function collectSkill(skillObj) {
     return true;
 }
 
-function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d', isBillboard = false) {
+function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d', isBillboard = false, isZoomable = false) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    canvas.width = 1024;
-    canvas.height = 512;
+    canvas.width = 2048;  // Increased for better quality
+    canvas.height = 1024; // Increased for better quality
 
-    // Background
-    context.fillStyle = bgColor;
+    // Background with slight gradient for depth
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, bgColor);
+    gradient.addColorStop(1, bgColor);
+    context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Border
+    // Border - thicker and more visible
     context.strokeStyle = textColor;
-    context.lineWidth = 8;
-    context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+    context.lineWidth = 16;
+    context.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
 
-    // Text
+    // Text with better readability
     context.fillStyle = textColor;
-    context.font = 'bold 48px Inter';
     context.textAlign = 'center';
     context.textBaseline = 'top';
 
     const lines = text.split('\n');
-    const lineHeight = 55;
-    const startY = (canvas.height - lines.length * lineHeight) / 2;
 
+    // Dynamic font size based on content
+    let fontSize = isBillboard ? 120 : 96; // Much larger fonts
+    const lineHeight = fontSize + 20;
+
+    // First line (title) is bigger
     lines.forEach((line, index) => {
-        context.fillText(line, canvas.width / 2, startY + index * lineHeight);
+        if (index === 0 && lines.length > 1) {
+            context.font = `bold ${fontSize * 1.3}px Arial, sans-serif`; // Bolder, clearer font
+        } else {
+            context.font = `600 ${fontSize}px Arial, sans-serif`;
+        }
+
+        const y = (canvas.height - lines.length * lineHeight) / 2 + index * lineHeight;
+
+        // Add text shadow for better readability
+        context.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        context.shadowBlur = 4;
+        context.shadowOffsetX = 2;
+        context.shadowOffsetY = 2;
+
+        context.fillText(line, canvas.width / 2, y);
     });
 
     const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
     const material = new THREE.MeshStandardMaterial({
         map: texture,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        transparent: false
     });
 
     const geometry = new THREE.PlaneGeometry(width, height);
@@ -368,10 +391,11 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
     board.castShadow = true;
     board.receiveShadow = true;
 
-    // Store billboard data for zoom functionality
-    if (isBillboard) {
-        board.userData.isBillboard = true;
-        board.userData.billboardText = text;
+    // Store data for zoom functionality
+    if (isBillboard || isZoomable) {
+        board.userData.isZoomable = true;
+        board.userData.zoomText = text;
+        board.userData.zoomTitle = lines[0];
         billboards.push(board);
     }
 
@@ -457,8 +481,8 @@ function createSkillBuckets() {
             scene.add(bucket);
             movableObjects.push(bucket);
 
-            // Label on bucket
-            const labelBoard = createTextBoard(skill, 1.5, 1, `#${group.color.toString(16).padStart(6, '0')}`, '#ffffff');
+            // Label on bucket - make it zoomable
+            const labelBoard = createTextBoard(skill, 1.5, 1, `#${group.color.toString(16).padStart(6, '0')}`, '#ffffff', false, true);
             labelBoard.position.set(x, 1, z + 1.2);
             scene.add(labelBoard);
         });
@@ -612,7 +636,7 @@ function createTrophyPodiums() {
         scene.add(trophy);
 
         // Plaque at base
-        const plaqueBoard = createTextBoard(`${award.title}\n${award.org}\n${award.year}`, 3, 2, '#ffffff', '#a87ab8');
+        const plaqueBoard = createTextBoard(`${award.title}\n${award.org}\n${award.year}`, 3, 2, '#ffffff', '#a87ab8', false, true);
         plaqueBoard.position.set(award.x, 0.5, award.z + 2.5);
         scene.add(plaqueBoard);
     });
@@ -662,7 +686,7 @@ function createTechFlowerGarden() {
             scene.add(flowerTop);
 
             // Label
-            const labelBoard = createTextBoard(flower, 1.5, 0.8, '#ffffff', '#2d2d2d');
+            const labelBoard = createTextBoard(flower, 1.5, 0.8, '#ffffff', '#2d2d2d', false, true);
             labelBoard.position.set(x, 0.6, z + 0.9);
             scene.add(labelBoard);
         });
@@ -712,8 +736,8 @@ function createContactLilyPond() {
     mainLily.receiveShadow = true;
     scene.add(mainLily);
 
-    // Main info on lily pad
-    const mainBoard = createTextBoard('Divij Shrivastava\nSoftware Engineer\n8 Years Experience', 5, 3, '#e8f5e9', '#2d2d2d');
+    // Main info on lily pad - make it zoomable
+    const mainBoard = createTextBoard('Divij Shrivastava\nSoftware Engineer\n8 Years Experience', 5, 3, '#e8f5e9', '#2d2d2d', false, true);
     mainBoard.rotation.x = -Math.PI / 2;
     mainBoard.position.set(0, 0.31, -55);
     scene.add(mainBoard);
@@ -742,8 +766,8 @@ function createContactLilyPond() {
         lily.receiveShadow = true;
         scene.add(lily);
 
-        // Contact info on lily pad
-        const contactBoard = createTextBoard(info.text, 3.5, 2, '#e8f5e9', '#2d2d2d');
+        // Contact info on lily pad - make it zoomable
+        const contactBoard = createTextBoard(info.text, 3.5, 2, '#e8f5e9', '#2d2d2d', false, true);
         contactBoard.rotation.x = -Math.PI / 2;
         contactBoard.position.set(x, 0.31, z);
         scene.add(contactBoard);
@@ -761,7 +785,7 @@ function createContactLilyPond() {
     eduLily.receiveShadow = true;
     scene.add(eduLily);
 
-    const eduBoard = createTextBoard('Education:\nB.E. Computer\nSRIT Jabalpur\n2012-2016', 4, 3, '#e8f5e9', '#2d2d2d');
+    const eduBoard = createTextBoard('Education:\nB.E. Computer\nSRIT Jabalpur\n2012-2016', 4, 3, '#e8f5e9', '#2d2d2d', false, true);
     eduBoard.rotation.x = -Math.PI / 2;
     eduBoard.position.set(0, 0.31, -63);
     scene.add(eduBoard);
@@ -1118,7 +1142,7 @@ function zoomToNearestBillboard() {
     bubble.style.transform = 'translate(-50%, -50%)';
 
     // Format text
-    const text = nearestBillboard.userData.billboardText;
+    const text = nearestBillboard.userData.zoomText || nearestBillboard.userData.billboardText;
     const formattedText = text.split('\n').map((line, index) => {
         if (index === 0) {
             return `<strong>${line}</strong>`;
