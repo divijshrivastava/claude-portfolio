@@ -1,6 +1,5 @@
-// Import Three.js and controls
+// Import Three.js
 import * as THREE from 'three';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 // Portfolio Data
 const portfolioData = {
@@ -115,27 +114,32 @@ const portfolioData = {
 };
 
 // Three.js Scene Setup
-let scene, camera, renderer, controls;
-let raycaster, mouse;
-let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-let canJump = false;
-let velocity = new THREE.Vector3();
-let direction = new THREE.Vector3();
-const objects = [];
-let interactiveObjects = [];
-let nearestObject = null;
+let scene, camera, renderer;
+let car, carBody;
+let keysPressed = {};
+let carSpeed = 0;
+let carRotation = 0;
+let sectionPlatforms = [];
+let currentSection = null;
+
+// Car physics
+const maxSpeed = 0.3;
+const acceleration = 0.01;
+const deceleration = 0.005;
+const turnSpeed = 0.03;
 
 // Initialize
 function init() {
     // Scene
     scene = new THREE.Scene();
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    scene.background = new THREE.Color(isDark ? 0x1a1a1a : 0xfafafa);
-    scene.fog = new THREE.Fog(isDark ? 0x1a1a1a : 0xfafafa, 50, 100);
+    scene.background = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
+    scene.fog = new THREE.Fog(isDark ? 0x1a1a1a : 0xe8e4f0, 50, 150);
 
-    // Camera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.6, 10);
+    // Camera - Top-down view
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 25, 15);
+    camera.lookAt(0, 0, 0);
 
     // Renderer
     const canvas = document.getElementById('webglCanvas');
@@ -150,17 +154,20 @@ function init() {
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 10);
+    directionalLight.position.set(20, 40, 20);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
     directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.far = 50;
+    directionalLight.shadow.camera.left = -50;
+    directionalLight.shadow.camera.right = 50;
+    directionalLight.shadow.camera.top = 50;
+    directionalLight.shadow.camera.bottom = -50;
     scene.add(directionalLight);
 
     // Ground
-    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundGeometry = new THREE.PlaneGeometry(200, 200);
     const groundMaterial = new THREE.MeshStandardMaterial({
-        color: isDark ? 0x242424 : 0xede8f0,
+        color: isDark ? 0x242424 : 0xd8d0dc,
         roughness: 0.8,
         metalness: 0.2
     });
@@ -168,17 +175,12 @@ function init() {
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
-    objects.push(ground);
 
-    // Create Interactive Objects
-    createPortfolioObjects();
+    // Create portfolio section platforms
+    createSectionPlatforms();
 
-    // Controls
-    controls = new PointerLockControls(camera, document.body);
-
-    // Raycaster for object interaction
-    raycaster = new THREE.Raycaster();
-    mouse = new THREE.Vector2();
+    // Create car
+    createCar();
 
     // Add event listeners
     addEventListeners();
@@ -187,140 +189,153 @@ function init() {
     animate();
 }
 
-function createPortfolioObjects() {
-    const positions = [
-        { x: -8, z: -5, data: 'experience', color: 0x8b5a9e, label: 'Experience' },
-        { x: 8, z: -5, data: 'skills', color: 0x6d4579, label: 'Skills' },
-        { x: -8, z: -15, data: 'awards', color: 0xa87ab8, label: 'Awards' },
-        { x: 8, z: -15, data: 'about', color: 0x5a3d54, label: 'About' }
+function createCar() {
+    car = new THREE.Group();
+
+    // Car body
+    const bodyGeometry = new THREE.BoxGeometry(2, 0.8, 4);
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8b5a9e,
+        roughness: 0.3,
+        metalness: 0.6
+    });
+    carBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    carBody.position.y = 0.8;
+    carBody.castShadow = true;
+    carBody.receiveShadow = true;
+    car.add(carBody);
+
+    // Car top/cabin
+    const cabinGeometry = new THREE.BoxGeometry(1.6, 0.6, 2.2);
+    const cabinMaterial = new THREE.MeshStandardMaterial({
+        color: 0x6d4579,
+        roughness: 0.3,
+        metalness: 0.6
+    });
+    const cabin = new THREE.Mesh(cabinGeometry, cabinMaterial);
+    cabin.position.set(0, 1.4, -0.3);
+    cabin.castShadow = true;
+    car.add(cabin);
+
+    // Wheels
+    const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+    const wheelMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2d2d2d,
+        roughness: 0.8
+    });
+
+    const wheelPositions = [
+        { x: -1, z: 1.2 },
+        { x: 1, z: 1.2 },
+        { x: -1, z: -1.2 },
+        { x: 1, z: -1.2 }
     ];
 
-    positions.forEach(pos => {
-        // Main cube
-        const geometry = new THREE.BoxGeometry(3, 3, 3);
-        const material = new THREE.MeshStandardMaterial({
-            color: pos.color,
-            roughness: 0.3,
+    wheelPositions.forEach(pos => {
+        const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(pos.x, 0.4, pos.z);
+        wheel.castShadow = true;
+        car.add(wheel);
+    });
+
+    // Position car at start
+    car.position.set(0, 0, 15);
+    scene.add(car);
+}
+
+function createSectionPlatforms() {
+    const sections = [
+        { x: -15, z: -10, data: 'experience', color: 0x8b5a9e, label: 'EXPERIENCE\n8 Years' },
+        { x: 15, z: -10, data: 'skills', color: 0x6d4579, label: 'SKILLS\nTechnologies' },
+        { x: -15, z: -35, data: 'awards', color: 0xa87ab8, label: 'AWARDS\nRecognition' },
+        { x: 15, z: -35, data: 'about', color: 0x5a3d54, label: 'ABOUT\nMe' }
+    ];
+
+    sections.forEach(section => {
+        // Platform
+        const platformGeometry = new THREE.BoxGeometry(12, 0.5, 12);
+        const platformMaterial = new THREE.MeshStandardMaterial({
+            color: section.color,
+            roughness: 0.4,
             metalness: 0.5
         });
-        const cube = new THREE.Mesh(geometry, material);
-        cube.position.set(pos.x, 1.5, pos.z);
-        cube.castShadow = true;
-        cube.receiveShadow = true;
-        cube.userData = { type: pos.data, label: pos.label };
-        scene.add(cube);
-        interactiveObjects.push(cube);
+        const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+        platform.position.set(section.x, 0.25, section.z);
+        platform.receiveShadow = true;
+        platform.castShadow = true;
+        platform.userData = { type: section.data, label: section.label };
+        scene.add(platform);
+        sectionPlatforms.push(platform);
 
-        // Add floating animation
-        cube.userData.originalY = cube.position.y;
-        cube.userData.floatOffset = Math.random() * Math.PI * 2;
+        // Border/frame around platform
+        const borderGeometry = new THREE.BoxGeometry(12.5, 0.3, 12.5);
+        const borderMaterial = new THREE.MeshStandardMaterial({
+            color: section.color,
+            roughness: 0.6,
+            metalness: 0.8,
+            emissive: section.color,
+            emissiveIntensity: 0.2
+        });
+        const border = new THREE.Mesh(borderGeometry, borderMaterial);
+        border.position.set(section.x, 0.05, section.z);
+        border.receiveShadow = true;
+        scene.add(border);
 
-        // Add text label (using sprite)
-        createTextLabel(pos.label, pos.x, 4, pos.z);
+        // Text label on platform using canvas texture
+        createPlatformText(section.label, section.x, section.z);
     });
 }
 
-function createTextLabel(text, x, y, z) {
+function createPlatformText(text, x, z) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 512;
-    canvas.height = 128;
+    canvas.height = 512;
 
+    // Background
     context.fillStyle = 'rgba(255, 255, 255, 0.9)';
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    context.font = 'bold 48px Inter';
+    // Text
+    context.font = 'bold 60px Inter';
     context.fillStyle = '#2d2d2d';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    const lines = text.split('\n');
+    lines.forEach((line, index) => {
+        const y = canvas.height / 2 + (index - lines.length / 2 + 0.5) * 80;
+        context.fillText(line, canvas.width / 2, y);
+    });
 
     const texture = new THREE.CanvasTexture(canvas);
-    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-    const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.position.set(x, y, z);
-    sprite.scale.set(4, 1, 1);
-    scene.add(sprite);
+    const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.95
+    });
+
+    const geometry = new THREE.PlaneGeometry(10, 10);
+    const plane = new THREE.Mesh(geometry, material);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(x, 0.51, z);
+    scene.add(plane);
 }
 
 function addEventListeners() {
     // Start button
     document.getElementById('startButton').addEventListener('click', () => {
         document.getElementById('welcomeOverlay').classList.add('hidden');
-        controls.lock();
-    });
-
-    // Pointer lock
-    controls.addEventListener('lock', () => {
-        document.querySelector('.ui-overlay').style.display = 'block';
-    });
-
-    controls.addEventListener('unlock', () => {
-        // User pressed ESC
     });
 
     // Keyboard controls
-    const onKeyDown = (event) => {
-        switch (event.code) {
-            case 'KeyW':
-            case 'ArrowUp':
-                moveForward = true;
-                break;
-            case 'KeyS':
-            case 'ArrowDown':
-                moveBackward = true;
-                break;
-            case 'KeyA':
-            case 'ArrowLeft':
-                moveLeft = true;
-                break;
-            case 'KeyD':
-            case 'ArrowRight':
-                moveRight = true;
-                break;
-            case 'Space':
-                if (canJump) velocity.y += 8;
-                canJump = false;
-                break;
-            case 'KeyE':
-                if (nearestObject) {
-                    showModal(nearestObject.userData.type);
-                }
-                break;
-        }
-    };
+    document.addEventListener('keydown', (e) => {
+        keysPressed[e.code] = true;
+    });
 
-    const onKeyUp = (event) => {
-        switch (event.code) {
-            case 'KeyW':
-            case 'ArrowUp':
-                moveForward = false;
-                break;
-            case 'KeyS':
-            case 'ArrowDown':
-                moveBackward = false;
-                break;
-            case 'KeyA':
-            case 'ArrowLeft':
-                moveLeft = false;
-                break;
-            case 'KeyD':
-            case 'ArrowRight':
-                moveRight = false;
-                break;
-        }
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
-
-    // Mouse click for object interaction
-    document.addEventListener('click', (event) => {
-        if (!controls.isLocked) return;
-
-        if (nearestObject) {
-            showModal(nearestObject.userData.type);
-        }
+    document.addEventListener('keyup', (e) => {
+        keysPressed[e.code] = false;
     });
 
     // Modal close
@@ -346,13 +361,13 @@ function toggleTheme() {
 
     // Update scene colors
     const isDark = newTheme === 'dark';
-    scene.background = new THREE.Color(isDark ? 0x1a1a1a : 0xfafafa);
-    scene.fog.color = new THREE.Color(isDark ? 0x1a1a1a : 0xfafafa);
+    scene.background = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
+    scene.fog.color = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
 
     // Update ground color
     scene.children.forEach(child => {
-        if (child.geometry && child.geometry.type === 'PlaneGeometry') {
-            child.material.color.setHex(isDark ? 0x242424 : 0xede8f0);
+        if (child.geometry && child.geometry.type === 'PlaneGeometry' && child.position.y === 0) {
+            child.material.color.setHex(isDark ? 0x242424 : 0xd8d0dc);
         }
     });
 }
@@ -362,7 +377,6 @@ function showModal(dataKey) {
     const content = document.getElementById('modalContent');
     content.innerHTML = portfolioData[dataKey].content;
     modal.classList.add('active');
-    controls.unlock();
 }
 
 function closeModal() {
@@ -376,63 +390,90 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function animate() {
-    requestAnimationFrame(animate);
-
-    const time = performance.now();
-
-    if (controls.isLocked) {
-        // Movement
-        const delta = 0.016; // Assuming 60fps
-
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
-        velocity.y -= 9.8 * 10.0 * delta; // Gravity
-
-        direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize();
-
-        if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
-
-        controls.moveRight(-velocity.x * delta);
-        controls.moveForward(-velocity.z * delta);
-
-        camera.position.y += velocity.y * delta;
-
-        if (camera.position.y < 1.6) {
-            velocity.y = 0;
-            camera.position.y = 1.6;
-            canJump = true;
-        }
-
-        // Check nearest object
-        let closestDist = Infinity;
-        nearestObject = null;
-
-        interactiveObjects.forEach(obj => {
-            const dist = camera.position.distanceTo(obj.position);
-            if (dist < 5 && dist < closestDist) {
-                closestDist = dist;
-                nearestObject = obj;
-            }
-        });
-
-        // Show interaction prompt
-        const prompt = document.getElementById('interactionPrompt');
-        if (nearestObject) {
-            prompt.classList.add('visible');
-        } else {
-            prompt.classList.remove('visible');
+function updateCar() {
+    // Forward/Backward
+    if (keysPressed['KeyW'] || keysPressed['ArrowUp']) {
+        carSpeed = Math.min(carSpeed + acceleration, maxSpeed);
+    } else if (keysPressed['KeyS'] || keysPressed['ArrowDown']) {
+        carSpeed = Math.max(carSpeed - acceleration, -maxSpeed * 0.5);
+    } else {
+        // Deceleration
+        if (carSpeed > 0) {
+            carSpeed = Math.max(0, carSpeed - deceleration);
+        } else if (carSpeed < 0) {
+            carSpeed = Math.min(0, carSpeed + deceleration);
         }
     }
 
-    // Animate interactive objects
-    interactiveObjects.forEach((obj, index) => {
-        obj.rotation.y += 0.01;
-        obj.position.y = obj.userData.originalY + Math.sin(time * 0.001 + obj.userData.floatOffset) * 0.2;
+    // Turning (only when moving)
+    if (Math.abs(carSpeed) > 0.01) {
+        if (keysPressed['KeyA'] || keysPressed['ArrowLeft']) {
+            carRotation += turnSpeed;
+        }
+        if (keysPressed['KeyD'] || keysPressed['ArrowRight']) {
+            carRotation -= turnSpeed;
+        }
+    }
+
+    // Apply movement
+    car.position.x += Math.sin(carRotation) * carSpeed;
+    car.position.z += Math.cos(carRotation) * carSpeed;
+    car.rotation.y = carRotation;
+
+    // Keep car within bounds
+    const maxDist = 90;
+    car.position.x = Math.max(-maxDist, Math.min(maxDist, car.position.x));
+    car.position.z = Math.max(-maxDist, Math.min(maxDist, car.position.z));
+
+    // Camera follow car
+    const cameraOffset = new THREE.Vector3(0, 25, 15);
+    const rotatedOffset = cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), carRotation);
+    camera.position.x = car.position.x + rotatedOffset.x;
+    camera.position.y = car.position.y + rotatedOffset.y;
+    camera.position.z = car.position.z + rotatedOffset.z;
+    camera.lookAt(car.position);
+
+    // Check for section proximity
+    let nearestSection = null;
+    let minDist = Infinity;
+
+    sectionPlatforms.forEach(platform => {
+        const dist = car.position.distanceTo(platform.position);
+        if (dist < 8 && dist < minDist) {
+            minDist = dist;
+            nearestSection = platform;
+        }
     });
+
+    // Update interaction prompt
+    const prompt = document.getElementById('interactionPrompt');
+    if (nearestSection && nearestSection !== currentSection) {
+        currentSection = nearestSection;
+        prompt.classList.add('visible');
+        prompt.querySelector('p').innerHTML = `<strong>${currentSection.userData.label.split('\n')[0]}</strong><br>Press <strong>E</strong> to view details`;
+    } else if (!nearestSection) {
+        currentSection = null;
+        prompt.classList.remove('visible');
+    }
+
+    // Interaction key
+    if (keysPressed['KeyE'] && currentSection) {
+        showModal(currentSection.userData.type);
+        keysPressed['KeyE'] = false; // Prevent repeated triggers
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    updateCar();
+
+    // Rotate car body slightly based on turning
+    if (carBody) {
+        const targetTilt = (keysPressed['KeyA'] || keysPressed['ArrowLeft']) ? 0.05 :
+                         (keysPressed['KeyD'] || keysPressed['ArrowRight']) ? -0.05 : 0;
+        carBody.rotation.z += (targetTilt - carBody.rotation.z) * 0.1;
+    }
 
     renderer.render(scene, camera);
 }

@@ -1,33 +1,34 @@
 # Divij Shrivastava - Interactive 3D Portfolio
 
-An interactive 3D portfolio website inspired by Bruno Simon's legendary portfolio. Navigate through a 3D world to explore professional experience, skills, awards, and achievements.
+An interactive 3D portfolio website inspired by Bruno Simon's legendary portfolio. Drive a car through a 3D world and visit different sections to explore professional experience, skills, awards, and achievements.
 
 ## ✨ Features
 
-- **🎮 Interactive 3D Experience**: Navigate through a Three.js-powered 3D world
-- **⌨️ First-Person Controls**: WASD/Arrow keys for movement, mouse for looking around, Space to jump
-- **🎨 Floating 3D Objects**: Four interactive cubes representing different portfolio sections
+- **🚗 Drive a 3D Car**: Control a purple car through a 3D world with realistic physics
+- **🌍 Top-Down View**: Sky camera that follows the car as you drive
+- **🎨 Ground Platforms**: Four colored platforms on the ground, each representing a portfolio section
 - **🌓 Dark Mode**: Toggle between light and dark themes (affects both UI and 3D scene)
 - **📱 Responsive Design**: Optimized for desktop, with mobile-friendly fallback
-- **🎭 Smooth Animations**: Floating cubes with rotation and ambient animations
+- **🎭 Smooth Physics**: Acceleration, deceleration, and turning mechanics
 - **💜 Purple Color Scheme**: Elegant deep purple palette inspired by divij.tech
 - **⚡ Loading Screen**: Smooth loading experience with progress bar
-- **📖 Welcome Instructions**: Clear controls guide for first-time visitors
-- **🎯 Interactive Prompts**: Get notified when near clickable objects
+- **📖 Welcome Instructions**: Clear driving controls for first-time visitors
+- **🎯 Interactive Prompts**: Get notified when driving over a section
 - **📝 Modal Content**: Detailed information displays in elegant overlays
+- **📐 Text Labels**: Section names printed directly on the ground platforms
 
 ## 🎮 Controls
 
-- **Mouse** - Look around
-- **W/A/S/D** or **Arrow Keys** - Move forward/left/back/right
-- **Space** - Jump
-- **E** or **Click** - Interact with nearby objects (when prompt appears)
-- **ESC** - Exit pointer lock mode
+- **W** or **↑** - Accelerate forward
+- **S** or **↓** - Brake / Reverse
+- **A** or **←** - Turn left (while moving)
+- **D** or **→** - Turn right (while moving)
+- **E** - Interact with section (when near a platform)
 
 ## 🛠️ Technologies Used
 
 - **Three.js** - 3D graphics and rendering
-- **PointerLockControls** - First-person camera controls
+- **Car Physics** - Custom acceleration, deceleration, and turning mechanics
 - **HTML5 Canvas** - 3D rendering surface
 - **CSS3** - Modern styling with CSS variables for theming
 - **Vanilla JavaScript** - Interactive features without dependencies
@@ -124,18 +125,19 @@ In `script.js`, modify the `createPortfolioObjects` function to add more cubes w
 
 ## 🎯 Interactive Elements
 
-The portfolio features four main 3D objects:
+The portfolio features four ground platforms:
 
-1. **Experience Cube** (Purple) - Professional work history
-2. **Skills Cube** (Dark Purple) - Technical expertise
-3. **Awards Cube** (Light Purple) - Achievements and recognition
-4. **About Cube** (Deep Purple) - Personal info and education
+1. **Experience Platform** (Purple, Left Front) - Professional work history spanning 8 years
+2. **Skills Platform** (Dark Purple, Right Front) - Technical expertise and technologies
+3. **Awards Platform** (Light Purple, Left Back) - Achievements and recognition
+4. **About Platform** (Deep Purple, Right Back) - Personal info and education
 
-Each cube:
-- Floats and rotates continuously
-- Has a text label above it
-- Shows an interaction prompt when you're nearby
-- Opens a modal with detailed content when clicked
+Each platform:
+- Is positioned on the ground with text labels
+- Has a colored border with subtle glow effect
+- Shows section name printed on the surface
+- Triggers an interaction prompt when car approaches
+- Opens a modal with detailed content when pressing E
 
 ## 🖥️ Browser Support
 
