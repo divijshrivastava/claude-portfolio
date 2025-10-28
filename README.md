@@ -1,36 +1,39 @@
 # Divij Shrivastava - Interactive 3D Portfolio
 
-An interactive 3D portfolio website inspired by Bruno Simon's legendary portfolio. Drive a car through a 3D world and visit different sections to explore professional experience, skills, awards, and achievements.
+An interactive 3D portfolio website inspired by Bruno Simon's legendary portfolio. Drive a car through an immersive 3D playground where every skill, experience, and achievement is a physical object you can discover and interact with.
 
 ## ✨ Features
 
 - **🚗 Drive a 3D Car**: Control a purple car through a 3D world with realistic physics
-- **🌍 Top-Down View**: Sky camera that follows the car as you drive
-- **🎨 Ground Platforms**: Four colored platforms on the ground, each representing a portfolio section
+- **🎥 Dynamic Camera**: Adjust camera angle with mouse wheel from top-down to ground-level view
+- **🎮 Interactive Playground**: Each portfolio item is a unique 3D object in the world
+- **💥 Physics-Based Collisions**: Solid objects block your path, movable objects get pushed
+- **🔊 Sound Effects**: Engine sounds that change with speed, collision sounds
 - **🌓 Dark Mode**: Toggle between light and dark themes (affects both UI and 3D scene)
 - **📱 Responsive Design**: Optimized for desktop, with mobile-friendly fallback
-- **🎭 Smooth Physics**: Acceleration, deceleration, and turning mechanics
+- **🎭 Realistic Physics**: Acceleration, deceleration, turning, and object interactions
 - **💜 Purple Color Scheme**: Elegant deep purple palette inspired by divij.tech
 - **⚡ Loading Screen**: Smooth loading experience with progress bar
 - **📖 Welcome Instructions**: Clear driving controls for first-time visitors
-- **🎯 Interactive Prompts**: Get notified when driving over a section
+- **🎯 Smart Object Detection**: Get notified when approaching interactive objects
 - **📝 Modal Content**: Detailed information displays in elegant overlays
-- **📐 Text Labels**: Section names printed directly on the ground platforms
-- **🌳 Environmental Objects**: Trees, pillars, boundary markers, and decorative elements for visual feedback
-- **🛣️ Path Markers**: Central path guides you between sections
+- **🏛️ Creative Object Design**: Experience as monuments, skills as themed objects, awards as trophies
+- **🌳 Environmental Obstacles**: Trees block your path, creating navigation challenges
 
 ## 🎮 Controls
 
-- **W** or **↑** - Accelerate forward
+- **W** or **↑** - Accelerate forward (with engine sound!)
 - **S** or **↓** - Brake / Reverse
 - **A** or **←** - Turn left (while moving)
 - **D** or **→** - Turn right (while moving)
-- **E** - Interact with section (when near a platform)
+- **Mouse Wheel** - Adjust camera angle (scroll down for ground view, scroll up for top-down view)
+- **E** - Interact with objects (when nearby)
 
 ## 🛠️ Technologies Used
 
 - **Three.js** - 3D graphics and rendering
-- **Car Physics** - Custom acceleration, deceleration, and turning mechanics
+- **Physics Engine** - Custom collision detection, object physics, and movement
+- **Web Audio API** - Dynamic engine sounds and collision effects
 - **HTML5 Canvas** - 3D rendering surface
 - **CSS3** - Modern styling with CSS variables for theming
 - **Vanilla JavaScript** - Interactive features without dependencies
@@ -125,35 +128,53 @@ const positions = [
 
 In `script.js`, modify the `createPortfolioObjects` function to add more cubes with custom positions, colors, and data.
 
-## 🎯 Interactive Elements
+## 🎯 Interactive Objects
 
-The portfolio features four ground platforms:
+The portfolio transforms traditional sections into a living 3D world with creative object representations:
 
-1. **Experience Platform** (Purple, Left Front) - Professional work history spanning 8 years
-2. **Skills Platform** (Dark Purple, Right Front) - Technical expertise and technologies
-3. **Awards Platform** (Light Purple, Left Back) - Achievements and recognition
-4. **About Platform** (Deep Purple, Right Back) - Personal info and education
+### 💼 Experience Objects (Monuments & Landmarks)
+- **Morgan Stanley** - Large engraved stone monument (2021-Present)
+- **TIAA** - Wooden signboard on posts (2019-2021)
+- **TCS** - Stone pillar/obelisk (2017-2019)
 
-Each platform:
-- Is positioned on the ground with text labels
-- Has a colored border with subtle glow effect
-- Shows section name printed on the surface
+### 🛠️ Skills Objects (Themed Creations)
+- **Java** - Coffee cup ☕ (solid obstacle)
+- **Spring** - Coiled spring (movable)
+- **Angular** - Red angular geometric shape (solid)
+- **MySQL/MongoDB** - Database barrels/spheres (movable)
+- **Git** - Branching tree structure (solid)
+- **Jenkins** - Pipeline structure (solid)
+- **HTML/CSS/JavaScript** - Building blocks and scrolls (movable)
+
+### 🏆 Awards Objects (Trophies & Monuments)
+- **Tech Showcase Winner** - Golden trophy on pedestal
+- **Pat on the Back** - Hand sculpture
+- **On the Spot Award** - Glowing star monument
+- **Arctic Code Vault** - Ice crystal structure
+
+### 👨‍💻 About Objects
+- **Education** - Graduation cap
+- **Contact Info** - Billboard with name and title
+
+Each object:
+- Has unique visual design reflecting its meaning
 - Triggers an interaction prompt when car approaches
 - Opens a modal with detailed content when pressing E
+- Either blocks the car (solid) or gets pushed around (movable)
 
 ## 🌳 Environmental Objects
 
-The world is populated with various objects to provide visual feedback and depth:
+The world is populated with various objects to provide visual feedback and navigation challenges:
 
-- **12 Trees** - Brown trunks with green foliage, scattered throughout the world
+- **12 Trees** - Solid obstacles! Brown trunks with green foliage that block your path
 - **12 Decorative Pillars** - Purple-topped posts positioned around sections
 - **28 Boundary Markers** - Purple cubes marking the edges of the playable area
-- **9 Decorative Cubes** - Small purple cubes scattered for visual interest
 - **9 Path Markers** - White/gray markers creating a central path between sections
 
 All objects:
 - Cast and receive shadows for realism
 - Adapt colors when switching between light/dark themes
+- Trees act as solid obstacles requiring navigation around them
 - Provide reference points to see car movement clearly
 
 ## 🖥️ Browser Support

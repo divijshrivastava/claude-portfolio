@@ -863,6 +863,18 @@ function addEventListeners() {
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
+    // Mute toggle
+    document.getElementById('muteToggle').addEventListener('click', toggleMute);
+
+    // Mouse wheel for camera angle control
+    window.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        // Scroll down (positive deltaY) = lower angle (towards ground)
+        // Scroll up (negative deltaY) = higher angle (towards top-down)
+        cameraAngle -= e.deltaY * 0.001;
+        cameraAngle = Math.max(minCameraAngle, Math.min(maxCameraAngle, cameraAngle));
+    }, { passive: false });
+
     // Window resize
     window.addEventListener('resize', onWindowResize);
 }
@@ -903,10 +915,15 @@ function checkCollision(pos1, radius1, pos2, radius2) {
 
 function updateCar() {
     // Forward/Backward
-    if (keysPressed['KeyW'] || keysPressed['ArrowUp']) {
+    const isAccelerating = keysPressed['KeyW'] || keysPressed['ArrowUp'];
+    const isBraking = keysPressed['KeyS'] || keysPressed['ArrowDown'];
+
+    if (isAccelerating) {
         carSpeed = Math.min(carSpeed + acceleration, maxSpeed);
-    } else if (keysPressed['KeyS'] || keysPressed['ArrowDown']) {
+        if (!isEngineRunning) playEngineSound();
+    } else if (isBraking) {
         carSpeed = Math.max(carSpeed - acceleration, -maxSpeed * 0.5);
+        if (!isEngineRunning) playEngineSound();
     } else {
         // Deceleration
         if (carSpeed > 0) {
@@ -914,6 +931,14 @@ function updateCar() {
         } else if (carSpeed < 0) {
             carSpeed = Math.min(0, carSpeed + deceleration);
         }
+        if (Math.abs(carSpeed) < 0.01 && isEngineRunning) {
+            stopEngineSound();
+        }
+    }
+
+    // Update engine sound
+    if (isEngineRunning) {
+        updateEngineSound(carSpeed);
     }
 
     // Turning (only when moving)
@@ -992,14 +1017,84 @@ function updateCar() {
 
     car.rotation.y = carRotation;
 
+    // Collision detection with solid objects (trees and interactive objects)
+    let collision = false;
+    const carBoundingBox = new THREE.Box3().setFromObject(car);
+
+    solidObjects.forEach(obj => {
+        const objBoundingBox = new THREE.Box3().setFromObject(obj);
+        if (carBoundingBox.intersectsBox(objBoundingBox)) {
+            collision = true;
+            // Revert position
+            car.position.x = oldX;
+            car.position.z = oldZ;
+            carSpeed *= -0.3; // Bounce back
+            playCollisionSound();
+        }
+    });
+
+    // Check collisions with movable objects
+    movableObjects.forEach(movObj => {
+        const objBoundingBox = new THREE.Box3().setFromObject(movObj.mesh);
+        if (carBoundingBox.intersectsBox(objBoundingBox)) {
+            // Calculate push direction
+            const pushDir = new THREE.Vector3(
+                movObj.mesh.position.x - car.position.x,
+                0,
+                movObj.mesh.position.z - car.position.z
+            ).normalize();
+
+            // Apply force to movable object
+            const force = Math.abs(carSpeed) * 2;
+            movObj.velocity.add(pushDir.multiplyScalar(force));
+
+            playCollisionSound();
+            carSpeed *= 0.7; // Slow down car
+        }
+    });
+
+    // Update movable objects physics
+    movableObjects.forEach(movObj => {
+        // Apply velocity
+        movObj.mesh.position.add(movObj.velocity);
+
+        // Apply friction
+        movObj.velocity.multiplyScalar(0.92);
+
+        // Keep within bounds
+        const maxDist = 85;
+        if (Math.abs(movObj.mesh.position.x) > maxDist) {
+            movObj.mesh.position.x = Math.sign(movObj.mesh.position.x) * maxDist;
+            movObj.velocity.x *= -0.5;
+        }
+        if (Math.abs(movObj.mesh.position.z) > maxDist) {
+            movObj.mesh.position.z = Math.sign(movObj.mesh.position.z) * maxDist;
+            movObj.velocity.z *= -0.5;
+        }
+
+        // Stop if velocity is very small
+        if (movObj.velocity.length() < 0.01) {
+            movObj.velocity.set(0, 0, 0);
+        }
+    });
+
     // Keep car within bounds
     const maxDist = 90;
     car.position.x = Math.max(-maxDist, Math.min(maxDist, car.position.x));
     car.position.z = Math.max(-maxDist, Math.min(maxDist, car.position.z));
 
-    // Camera follow car
-    const cameraOffset = new THREE.Vector3(0, 25, 15);
+    // Camera follow car with dynamic angle
+    // Calculate camera height and distance based on angle
+    const cameraHeight = cameraDistance * Math.sin(cameraAngle);
+    const cameraHorizontalDist = cameraDistance * Math.cos(cameraAngle);
+
+    // Create offset vector (camera behind and above the car)
+    const cameraOffset = new THREE.Vector3(0, cameraHeight, cameraHorizontalDist);
+
+    // Rotate offset to match car rotation
     const rotatedOffset = cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), carRotation);
+
+    // Position camera
     camera.position.x = car.position.x + rotatedOffset.x;
     camera.position.y = car.position.y + rotatedOffset.y;
     camera.position.z = car.position.z + rotatedOffset.z;
@@ -1042,6 +1137,13 @@ window.addEventListener('DOMContentLoaded', () => {
     // Check theme
     const currentTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', currentTheme);
+
+    // Check mute state
+    const savedMuteState = localStorage.getItem('soundMuted');
+    if (savedMuteState === 'true') {
+        isMuted = true;
+        document.getElementById('muteToggle').classList.add('muted');
+    }
 
     // Simulate loading
     const loadingProgress = document.getElementById('loadingProgress');
