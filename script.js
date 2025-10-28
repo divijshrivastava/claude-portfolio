@@ -130,6 +130,13 @@ const acceleration = 0.01;
 const deceleration = 0.005;
 const turnSpeed = 0.03;
 
+// Camera control
+let cameraAngle = Math.PI / 3; // Start at 60 degrees (top-down view)
+const minCameraAngle = Math.PI / 12; // 15 degrees (low angle, near ground)
+const maxCameraAngle = Math.PI / 2.2; // ~82 degrees (high top-down view)
+const cameraDistance = 30; // Distance from car
+const cameraScrollSpeed = 0.05;
+
 // Sound effects
 let audioContext;
 let engineSound;
@@ -989,6 +996,15 @@ function addEventListeners() {
     // Mute toggle
     document.getElementById('muteToggle').addEventListener('click', toggleMute);
 
+    // Mouse wheel for camera angle control
+    window.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        // Scroll down (positive deltaY) = lower angle (towards ground)
+        // Scroll up (negative deltaY) = higher angle (towards top-down)
+        cameraAngle -= e.deltaY * 0.001;
+        cameraAngle = Math.max(minCameraAngle, Math.min(maxCameraAngle, cameraAngle));
+    }, { passive: false });
+
     // Window resize
     window.addEventListener('resize', onWindowResize);
 }
@@ -1192,13 +1208,29 @@ function updateCar() {
     car.position.x = Math.max(-maxDist, Math.min(maxDist, car.position.x));
     car.position.z = Math.max(-maxDist, Math.min(maxDist, car.position.z));
 
-    // Camera follow car
-    const cameraOffset = new THREE.Vector3(0, 25, 15);
+    // Camera follow car with dynamic angle
+    // Calculate camera height and distance based on angle
+    const cameraHeight = cameraDistance * Math.sin(cameraAngle);
+    const cameraHorizontalDist = cameraDistance * Math.cos(cameraAngle);
+
+    // Create offset vector (camera behind and above the car)
+    const cameraOffset = new THREE.Vector3(0, cameraHeight, cameraHorizontalDist);
+
+    // Rotate offset to match car rotation
     const rotatedOffset = cameraOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), carRotation);
+
+    // Position camera
     camera.position.x = car.position.x + rotatedOffset.x;
     camera.position.y = car.position.y + rotatedOffset.y;
     camera.position.z = car.position.z + rotatedOffset.z;
-    camera.lookAt(car.position);
+
+    // Look at a point slightly ahead of the car for better view
+    const lookAtPoint = new THREE.Vector3(
+        car.position.x,
+        car.position.y + 1,
+        car.position.z
+    );
+    camera.lookAt(lookAtPoint);
 
     // Check for object proximity
     let nearestObject = null;
