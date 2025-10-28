@@ -1,0 +1,16 @@
+# Resume PDF (keep local only)
+*.pdf
+Divij Resume*.pdf
+
+# Claude Code configuration
+.claude/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
