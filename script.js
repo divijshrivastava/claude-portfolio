@@ -28,6 +28,10 @@ let movableObjects = [];
 let staticObjects = [];
 let soundsLoaded = false;
 
+// Points system
+let points = 0;
+let collectedSkills = new Set();
+
 // Audio context and sounds
 let audioContext;
 let engineSound, accelerateSound, collisionSound, objectHitSound;
@@ -198,6 +202,36 @@ function playObjectHitSound() {
     oscillator.stop(audioContext.currentTime + 0.15);
 }
 
+function playSkillCollectSound() {
+    if (!audioContext || isMuted) return;
+
+    // Create a pleasant coin/power-up sound
+    const oscillator1 = audioContext.createOscillator();
+    const oscillator2 = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator1.type = 'sine';
+    oscillator2.type = 'sine';
+
+    // Musical interval (major third)
+    oscillator1.frequency.value = 523.25; // C5
+    oscillator2.frequency.value = 659.25; // E5
+
+    gainNode.gain.value = 0.3;
+
+    oscillator1.connect(gainNode);
+    oscillator2.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator1.start();
+    oscillator2.start(audioContext.currentTime + 0.05);
+
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+    oscillator1.stop(audioContext.currentTime + 0.3);
+    oscillator2.stop(audioContext.currentTime + 0.35);
+}
+
 function updateEngineSound(speed) {
     if (!audioContext || !engineSound || isMuted) return;
 
@@ -217,6 +251,75 @@ function updateEngineSound(speed) {
         engineSound.oscillator.frequency.linearRampToValueAtTime(80, audioContext.currentTime + 0.2);
         engineSound.oscillator2.frequency.linearRampToValueAtTime(40, audioContext.currentTime + 0.2);
     }
+}
+
+function showSkillBubble(skillName, screenX, screenY) {
+    // Create bubble element
+    const bubble = document.createElement('div');
+    bubble.className = 'skill-bubble';
+    bubble.style.left = screenX + 'px';
+    bubble.style.top = screenY + 'px';
+
+    bubble.innerHTML = `
+        <div class="bubble-cloud">
+            <div class="bubble-text">${skillName}</div>
+            <div class="bubble-points">+1</div>
+        </div>
+    `;
+
+    document.body.appendChild(bubble);
+
+    // Remove after animation completes
+    setTimeout(() => {
+        bubble.remove();
+    }, 2000);
+}
+
+function collectSkill(skillObj) {
+    // Check if already collected
+    if (collectedSkills.has(skillObj.uuid)) {
+        return false;
+    }
+
+    // Mark as collected
+    collectedSkills.add(skillObj.uuid);
+
+    // Get skill name from userData
+    const skillName = skillObj.userData.skillName || 'Skill';
+
+    // Update points
+    points++;
+    const pointsDisplay = document.getElementById('pointsValue');
+    if (pointsDisplay) {
+        pointsDisplay.textContent = points;
+        // Add animation class
+        pointsDisplay.style.transform = 'scale(1.3)';
+        setTimeout(() => {
+            pointsDisplay.style.transform = 'scale(1)';
+        }, 200);
+    }
+
+    // Get screen position for bubble
+    const vector = new THREE.Vector3();
+    skillObj.getWorldPosition(vector);
+    vector.project(camera);
+
+    const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
+    const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+    // Show bubble effect
+    showSkillBubble(skillName, screenX, screenY);
+
+    // Play collection sound
+    playSkillCollectSound();
+
+    // Make the skill semi-transparent to show it's collected
+    if (skillObj.material) {
+        skillObj.material.transparent = true;
+        skillObj.material.opacity = 0.3;
+    }
+
+    return true;
 }
 
 function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d') {
@@ -336,7 +439,7 @@ function createSkillBuckets() {
             bucket.position.set(x, 1, z);
             bucket.castShadow = true;
             bucket.receiveShadow = true;
-            bucket.userData = { type: 'movable', mass: 1 };
+            bucket.userData = { type: 'movable', mass: 1, isSkill: true, skillName: skill };
             scene.add(bucket);
             movableObjects.push(bucket);
 
@@ -501,7 +604,7 @@ function createTechFlowerGarden() {
             pot.position.set(x, 0.6, z);
             pot.castShadow = true;
             pot.receiveShadow = true;
-            pot.userData = { type: 'movable', mass: 0.8 };
+            pot.userData = { type: 'movable', mass: 0.8, isSkill: true, skillName: flower };
             scene.add(pot);
             movableObjects.push(pot);
 
@@ -1010,7 +1113,12 @@ function updateCar() {
     for (const obj of movableObjects) {
         const objRadius = 1;
         if (checkCollision({ x: newX, z: newZ }, carRadius, obj.position, objRadius)) {
-            playObjectHitSound();
+            // Check if this is a skill object and collect it
+            if (obj.userData.isSkill) {
+                collectSkill(obj);
+            } else {
+                playObjectHitSound();
+            }
 
             // Calculate push direction
             const pushDir = {
