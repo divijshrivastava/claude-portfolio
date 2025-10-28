@@ -997,13 +997,26 @@ function addEventListeners() {
     document.getElementById('muteToggle').addEventListener('click', toggleMute);
 
     // Mouse wheel for camera angle control
-    window.addEventListener('wheel', (e) => {
+    const canvas = document.getElementById('webglCanvas');
+    const cameraAngleDisplay = document.getElementById('cameraAngleValue');
+
+    const handleWheel = (e) => {
         e.preventDefault();
         // Scroll down (positive deltaY) = lower angle (towards ground)
         // Scroll up (negative deltaY) = higher angle (towards top-down)
-        cameraAngle -= e.deltaY * 0.001;
+        const delta = e.deltaY * 0.001;
+        cameraAngle -= delta;
         cameraAngle = Math.max(minCameraAngle, Math.min(maxCameraAngle, cameraAngle));
-    }, { passive: false });
+
+        // Update display
+        const angleInDegrees = Math.round(cameraAngle * 180 / Math.PI);
+        cameraAngleDisplay.textContent = angleInDegrees + '°';
+
+        console.log('Camera angle:', angleInDegrees, '°');
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
 
     // Window resize
     window.addEventListener('resize', onWindowResize);
