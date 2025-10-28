@@ -1024,10 +1024,16 @@ function addEventListeners() {
     });
 
     // Theme toggle
-    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    const themeToggle = document.getElementById('themeToggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
 
     // Mute toggle
-    document.getElementById('muteToggle').addEventListener('click', toggleMute);
+    const muteToggle = document.getElementById('muteToggle');
+    if (muteToggle) {
+        muteToggle.addEventListener('click', toggleMute);
+    }
 
     // Mouse wheel for camera angle control
     window.addEventListener('wheel', (e) => {
@@ -1422,7 +1428,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const savedMuteState = localStorage.getItem('soundMuted');
     if (savedMuteState === 'true') {
         isMuted = true;
-        document.getElementById('muteToggle').classList.add('muted');
+        const muteToggleBtn = document.getElementById('muteToggle');
+        if (muteToggleBtn) {
+            muteToggleBtn.classList.add('muted');
+        }
     }
 
     // Simulate loading
