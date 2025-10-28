@@ -38,8 +38,9 @@ let isZoomed = false;
 let nearestBillboard = null;
 let nearestDistance = Infinity;
 
-// NPCs
+// NPCs and Traffic
 let npcs = [];
+let trafficVehicles = [];
 
 // Audio context and sounds
 let audioContext;
@@ -109,6 +110,9 @@ function init() {
 
     // Create NPCs
     createNPCs();
+
+    // Create traffic vehicles
+    createTrafficVehicles();
 
     // Create car
     createCar();
@@ -601,15 +605,161 @@ function createNPC(x, z, color) {
 }
 
 function createNPCs() {
-    const npcColors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6, 0x1abc9c];
+    // Expanded color palette for bustling NYC feel
+    const npcColors = [
+        0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6, 0x1abc9c,
+        0x00d4ff, 0xff2e97, 0x6b2bff, 0xff6d00, 0x00ff88, 0xffd700,
+        0xe91e63, 0x9c27b0, 0x673ab7, 0x3f51b5, 0x2196f3, 0x00bcd4
+    ];
 
-    // Create NPCs at various locations (4x scale)
-    for (let i = 0; i < 15; i++) {
+    // Create many more NPCs for busy NYC streets (50 NPCs)
+    for (let i = 0; i < 50; i++) {
         const x = (Math.random() - 0.5) * 240;
         const z = -240 + Math.random() * 320;
         const color = npcColors[Math.floor(Math.random() * npcColors.length)];
         createNPC(x, z, color);
     }
+}
+
+function createTrafficVehicle(x, z, lane) {
+    const vehicle = new THREE.Group();
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Random vehicle colors (NYC taxi yellow, various car colors)
+    const vehicleColors = [
+        0xffd700, // Taxi yellow
+        0xff6d00, // Orange
+        0x00d4ff, // Cyan
+        0xff2e97, // Pink
+        0x2196f3, // Blue
+        0x1a1a1a, // Black
+        0xe0e0e0, // Silver
+        0xff0000  // Red
+    ];
+    const color = vehicleColors[Math.floor(Math.random() * vehicleColors.length)];
+
+    // Vehicle body (slightly smaller than player car)
+    const bodyGeometry = new THREE.BoxGeometry(1.8, 0.7, 3.5);
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: 0.3,
+        metalness: 0.7,
+        emissive: isDark ? color : 0x000000,
+        emissiveIntensity: isDark ? 0.1 : 0
+    });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 0.7;
+    body.castShadow = true;
+    vehicle.add(body);
+
+    // Vehicle cabin
+    const cabinGeometry = new THREE.BoxGeometry(1.5, 0.5, 2);
+    const cabinMaterial = new THREE.MeshStandardMaterial({
+        color: isDark ? 0x1a1a1a : 0x333333,
+        roughness: 0.2,
+        metalness: 0.8
+    });
+    const cabin = new THREE.Mesh(cabinGeometry, cabinMaterial);
+    cabin.position.set(0, 1.2, -0.3);
+    cabin.castShadow = true;
+    vehicle.add(cabin);
+
+    // Wheels
+    const wheelGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12);
+    const wheelMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1a1a1a,
+        roughness: 0.8
+    });
+
+    const wheelPositions = [
+        { x: -0.9, z: 1 },
+        { x: 0.9, z: 1 },
+        { x: -0.9, z: -1 },
+        { x: 0.9, z: -1 }
+    ];
+
+    wheelPositions.forEach(pos => {
+        const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(pos.x, 0.35, pos.z);
+        wheel.castShadow = true;
+        vehicle.add(wheel);
+    });
+
+    vehicle.position.set(x, 0, z);
+    vehicle.userData = {
+        lane: lane, // -1 for left lane, 1 for right lane
+        speed: 0.15 + Math.random() * 0.1, // Random speed
+        direction: lane === -1 ? Math.PI : 0 // Opposite directions
+    };
+    vehicle.rotation.y = vehicle.userData.direction;
+
+    scene.add(vehicle);
+    trafficVehicles.push(vehicle);
+
+    return vehicle;
+}
+
+function createTrafficVehicles() {
+    // Create traffic on both lanes (left going down, right going up)
+    const numVehicles = 20;
+
+    for (let i = 0; i < numVehicles; i++) {
+        const lane = Math.random() > 0.5 ? -1 : 1; // Left or right lane
+        const x = lane * 12; // Position in lane (left: -12, right: 12)
+        const z = -240 + Math.random() * 320; // Random position along road
+        createTrafficVehicle(x, z, lane);
+    }
+}
+
+function updateTrafficVehicles() {
+    trafficVehicles.forEach(vehicle => {
+        // Move vehicle forward in its lane
+        if (vehicle.userData.lane === -1) {
+            // Left lane going down (negative z)
+            vehicle.position.z -= vehicle.userData.speed;
+
+            // Loop back to start when reaching end
+            if (vehicle.position.z < -280) {
+                vehicle.position.z = 80;
+            }
+        } else {
+            // Right lane going up (positive z)
+            vehicle.position.z += vehicle.userData.speed;
+
+            // Loop back to start when reaching end
+            if (vehicle.position.z > 80) {
+                vehicle.position.z = -280;
+            }
+        }
+
+        // Simple collision avoidance with other traffic
+        trafficVehicles.forEach(otherVehicle => {
+            if (vehicle !== otherVehicle && vehicle.userData.lane === otherVehicle.userData.lane) {
+                const distance = Math.abs(vehicle.position.z - otherVehicle.position.z);
+                if (distance < 15) {
+                    // Slow down if too close to vehicle ahead
+                    const currentSpeed = vehicle.userData.speed;
+                    vehicle.userData.speed = Math.max(0.05, currentSpeed * 0.95);
+                } else {
+                    // Speed back up
+                    const targetSpeed = 0.15 + Math.random() * 0.1;
+                    vehicle.userData.speed = Math.min(targetSpeed, vehicle.userData.speed * 1.02);
+                }
+            }
+        });
+
+        // Avoid player car
+        const distToCar = Math.sqrt(
+            Math.pow(vehicle.position.x - car.position.x, 2) +
+            Math.pow(vehicle.position.z - car.position.z, 2)
+        );
+
+        if (distToCar < 10) {
+            // Slow down near player
+            vehicle.userData.speed *= 0.9;
+        }
+    });
 }
 
 function updateNPCs() {
@@ -1260,7 +1410,7 @@ function createEnvironment() {
         treeGroup.add(foliage);
 
         treeGroup.position.set(pos.x, 0, pos.z);
-        treeGroup.userData = { type: 'static', radius: 12 };
+        treeGroup.userData = { type: 'static', radius: 4 }; // Reduced from 12 to 4 for better collision
         scene.add(treeGroup);
         staticObjects.push(treeGroup);
     });
@@ -1693,6 +1843,9 @@ function animate() {
 
     // Update NPCs
     updateNPCs();
+
+    // Update traffic vehicles
+    updateTrafficVehicles();
 
     // Rotate car body slightly based on turning
     if (carBody) {
