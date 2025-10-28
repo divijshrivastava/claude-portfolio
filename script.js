@@ -1,3 +1,7 @@
+// Import Three.js and controls
+import * as THREE from 'three';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
 // Portfolio Data
 const portfolioData = {
     experience: {
@@ -170,7 +174,7 @@ function init() {
     createPortfolioObjects();
 
     // Controls
-    controls = new THREE.PointerLockControls(camera, document.body);
+    controls = new PointerLockControls(camera, document.body);
 
     // Raycaster for object interaction
     raycaster = new THREE.Raycaster();
