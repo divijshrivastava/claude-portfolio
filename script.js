@@ -1,132 +1,31 @@
 // Import Three.js
 import * as THREE from 'three';
 
-// Portfolio Data
-const portfolioData = {
-    experience: {
-        title: "Experience",
-        content: `
-            <h2>Professional Experience (8 Years)</h2>
-
-            <h3>Morgan Stanley - Software Engineer</h3>
-            <p><strong>August 2021 - Present | Mumbai</strong></p>
-            <p>Built DWMS platform which automates the decision making workflow in pre-trade for ESG funds. Worked with Java, Spring to build the backend and Angular for the front end. This platform helped save time and efforts by replacing vendor products that were not scalable for requirement and couldn't integrate with internal products, saving the firm time and expenses and reducing the decision research cycle.</p>
-            <div class="tech-tags">
-                <span class="tag">Java</span>
-                <span class="tag">Spring</span>
-                <span class="tag">Angular</span>
-            </div>
-
-            <h3>TIAA GBS - Software Engineer</h3>
-            <p><strong>June 2019 - August 2021 | Pune</strong></p>
-            <p>Worked with Java and Angular to develop an E-commerce like web-application called UD Prime for the purchase of insurance products in which products could be added to cart and later checked out.</p>
-            <div class="tech-tags">
-                <span class="tag">Java</span>
-                <span class="tag">Angular</span>
-            </div>
-
-            <h3>TCS - Assistant Systems Engineer</h3>
-            <p><strong>March 2017 - June 2019 | Pune</strong></p>
-            <p>Engineered a storage drive application called DG Drive where a user or an application could upload numerous documents and receipts with Java, Angular, RESTful Web Services, and MySQL.</p>
-            <div class="tech-tags">
-                <span class="tag">Java</span>
-                <span class="tag">Angular</span>
-                <span class="tag">MySQL</span>
-                <span class="tag">RESTful</span>
-            </div>
-        `
-    },
-    skills: {
-        title: "Skills & Technologies",
-        content: `
-            <h2>Technical Expertise</h2>
-
-            <h3>Backend</h3>
-            <div class="tech-tags">
-                <span class="tag">Java 8</span>
-                <span class="tag">Spring</span>
-                <span class="tag">Spring Boot</span>
-                <span class="tag">Spring Security</span>
-                <span class="tag">Spring MVC</span>
-                <span class="tag">Gradle</span>
-            </div>
-
-            <h3>Frontend</h3>
-            <div class="tech-tags">
-                <span class="tag">Angular 8</span>
-                <span class="tag">HTML</span>
-                <span class="tag">CSS</span>
-                <span class="tag">JavaScript</span>
-                <span class="tag">RESTful Web Services</span>
-            </div>
-
-            <h3>Technologies & Tools</h3>
-            <div class="tech-tags">
-                <span class="tag">MySQL</span>
-                <span class="tag">MongoDB</span>
-                <span class="tag">Git</span>
-                <span class="tag">Jenkins</span>
-            </div>
-        `
-    },
-    awards: {
-        title: "Awards & Recognition",
-        content: `
-            <h2>Achievements</h2>
-
-            <h3>🏆 Tech Showcase Winner</h3>
-            <p><strong>Morgan Stanley</strong></p>
-            <p>Won Tech Showcase twice in 2023 and 2024</p>
-
-            <h3>⭐ Pat on the Back Award</h3>
-            <p><strong>TIAA</strong></p>
-            <p>For exceptional performance in delivering applications on time</p>
-
-            <h3>💡 On the Spot Award</h3>
-            <p><strong>TCS</strong></p>
-            <p>For out-of-box thinking and delivering applications on time. Solved a critical client issue by identifying inadequate database data when everyone was looking for code bugs.</p>
-
-            <h3>❄️ Arctic Code Vault Contributor</h3>
-            <p><strong>GitHub</strong></p>
-            <p>Contributed to open-source projects archived in GitHub's Arctic Code Vault</p>
-        `
-    },
-    about: {
-        title: "About Me",
-        content: `
-            <h2>Divij Shrivastava</h2>
-            <h3>Software Engineer</h3>
-            <p>Full-stack developer with 8 years of experience building scalable enterprise applications using Java, Spring, and Angular at leading financial institutions.</p>
-
-            <h3>Education</h3>
-            <p><strong>Bachelor of Engineering</strong></p>
-            <p>Shri Ram Institute of Technology, Jabalpur</p>
-            <p>July 2012 - June 2016 | CGPA: 7.8</p>
-
-            <h3>Contact</h3>
-            <ul>
-                <li>📧 divij.shrivastava@gmail.com</li>
-                <li>📱 (+91) 8871962152</li>
-                <li>🌐 divij.tech</li>
-            </ul>
-        `
-    }
-};
-
 // Three.js Scene Setup
 let scene, camera, renderer;
 let car, carBody;
 let keysPressed = {};
 let carSpeed = 0;
 let carRotation = 0;
-let sectionPlatforms = [];
-let currentSection = null;
 
 // Car physics
 const maxSpeed = 0.3;
 const acceleration = 0.01;
 const deceleration = 0.005;
 const turnSpeed = 0.03;
+
+// Interactive objects arrays
+let movableObjects = [];
+let staticObjects = [];
+let soundsLoaded = false;
+
+// Audio context and sounds
+let audioContext;
+let engineSound, accelerateSound, collisionSound, objectHitSound;
+
+// Engine sound state
+let isEngineRunning = false;
+let engineGainNode;
 
 // Initialize
 function init() {
@@ -164,22 +63,30 @@ function init() {
     directionalLight.shadow.camera.bottom = -50;
     scene.add(directionalLight);
 
-    // Ground
+    // Ground - grass-like
     const groundGeometry = new THREE.PlaneGeometry(200, 200);
     const groundMaterial = new THREE.MeshStandardMaterial({
-        color: isDark ? 0x242424 : 0xd8d0dc,
-        roughness: 0.8,
-        metalness: 0.2
+        color: isDark ? 0x1a2a1a : 0x7cb87c,
+        roughness: 0.9,
+        metalness: 0.1
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Create portfolio section platforms
-    createSectionPlatforms();
+    // Initialize audio
+    initAudio();
 
-    // Create environmental objects
+    // Create themed playground areas
+    createSkillBuckets();
+    createCareerSteppingStones();
+    createTrophyPodiums();
+    createTechFlowerGarden();
+    createContactLilyPond();
+    createInteractiveObjects();
+
+    // Create environmental objects (trees, obstacles)
     createEnvironment();
 
     // Create car
@@ -190,6 +97,616 @@ function init() {
 
     // Start animation
     animate();
+}
+
+// Audio initialization
+function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Resume audio context on user interaction (required by browsers)
+        document.addEventListener('keydown', () => {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }, { once: true });
+
+        // Create engine gain node for volume control
+        engineGainNode = audioContext.createGain();
+        engineGainNode.gain.value = 0;
+        engineGainNode.connect(audioContext.destination);
+
+        // Create oscillator for engine sound
+        createEngineSound();
+
+        soundsLoaded = true;
+    } catch (e) {
+        console.log('Audio not supported:', e);
+    }
+}
+
+function createEngineSound() {
+    if (!audioContext) return;
+
+    // Create a continuous oscillator for engine sound
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.value = 80;
+
+    const oscillator2 = audioContext.createOscillator();
+    oscillator2.type = 'sine';
+    oscillator2.frequency.value = 40;
+
+    const gainNode1 = audioContext.createGain();
+    gainNode1.gain.value = 0.3;
+    const gainNode2 = audioContext.createGain();
+    gainNode2.gain.value = 0.2;
+
+    oscillator.connect(gainNode1);
+    oscillator2.connect(gainNode2);
+    gainNode1.connect(engineGainNode);
+    gainNode2.connect(engineGainNode);
+
+    oscillator.start();
+    oscillator2.start();
+
+    engineSound = { oscillator, oscillator2, gainNode1, gainNode2 };
+}
+
+function playCollisionSound(intensity = 1) {
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = 'square';
+    oscillator.frequency.value = 100;
+    gainNode.gain.value = Math.min(intensity * 0.3, 0.5);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    oscillator.stop(audioContext.currentTime + 0.2);
+}
+
+function playObjectHitSound() {
+    if (!audioContext) return;
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = 'triangle';
+    oscillator.frequency.value = 200 + Math.random() * 200;
+    gainNode.gain.value = 0.15;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+    oscillator.stop(audioContext.currentTime + 0.15);
+}
+
+function updateEngineSound(speed) {
+    if (!audioContext || !engineSound) return;
+
+    const absSpeed = Math.abs(speed);
+
+    if (absSpeed > 0.01) {
+        // Engine is running
+        const targetVolume = 0.1 + absSpeed * 0.3;
+        const targetFreq = 80 + absSpeed * 400;
+
+        engineGainNode.gain.linearRampToValueAtTime(targetVolume, audioContext.currentTime + 0.1);
+        engineSound.oscillator.frequency.linearRampToValueAtTime(targetFreq, audioContext.currentTime + 0.1);
+        engineSound.oscillator2.frequency.linearRampToValueAtTime(targetFreq / 2, audioContext.currentTime + 0.1);
+    } else {
+        // Engine idle
+        engineGainNode.gain.linearRampToValueAtTime(0.02, audioContext.currentTime + 0.2);
+        engineSound.oscillator.frequency.linearRampToValueAtTime(80, audioContext.currentTime + 0.2);
+        engineSound.oscillator2.frequency.linearRampToValueAtTime(40, audioContext.currentTime + 0.2);
+    }
+}
+
+function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d') {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 1024;
+    canvas.height = 512;
+
+    // Background
+    context.fillStyle = bgColor;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Border
+    context.strokeStyle = textColor;
+    context.lineWidth = 8;
+    context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+
+    // Text
+    context.fillStyle = textColor;
+    context.font = 'bold 48px Inter';
+    context.textAlign = 'center';
+    context.textBaseline = 'top';
+
+    const lines = text.split('\n');
+    const lineHeight = 55;
+    const startY = (canvas.height - lines.length * lineHeight) / 2;
+
+    lines.forEach((line, index) => {
+        context.fillText(line, canvas.width / 2, startY + index * lineHeight);
+    });
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.MeshStandardMaterial({
+        map: texture,
+        side: THREE.DoubleSide
+    });
+
+    const geometry = new THREE.PlaneGeometry(width, height);
+    const board = new THREE.Mesh(geometry, material);
+    board.castShadow = true;
+    board.receiveShadow = true;
+    return board;
+}
+
+function createSkillBuckets() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Create puddles with skill buckets
+    const skillGroups = [
+        {
+            title: 'BACKEND',
+            skills: ['Java 8', 'Spring Boot', 'Spring MVC', 'Gradle'],
+            x: 20,
+            z: -10,
+            color: 0x4a7ba7
+        },
+        {
+            title: 'FRONTEND',
+            skills: ['Angular 8', 'HTML/CSS', 'JavaScript', 'REST APIs'],
+            x: 20,
+            z: -25,
+            color: 0xe67e22
+        },
+        {
+            title: 'DATABASES & TOOLS',
+            skills: ['MySQL', 'MongoDB', 'Git', 'Jenkins'],
+            x: 20,
+            z: -40,
+            color: 0x27ae60
+        }
+    ];
+
+    skillGroups.forEach(group => {
+        // Create puddle/water feature (flat blue circle)
+        const puddleGeometry = new THREE.CircleGeometry(6, 32);
+        const puddleMaterial = new THREE.MeshStandardMaterial({
+            color: isDark ? 0x1a3d5c : 0x5dade2,
+            roughness: 0.2,
+            metalness: 0.8,
+            transparent: true,
+            opacity: 0.7
+        });
+        const puddle = new THREE.Mesh(puddleGeometry, puddleMaterial);
+        puddle.rotation.x = -Math.PI / 2;
+        puddle.position.set(group.x, 0.02, group.z);
+        puddle.receiveShadow = true;
+        scene.add(puddle);
+
+        // Title sign above puddle
+        const titleBoard = createTextBoard(group.title, 8, 2, '#ffffff', '#2d2d2d');
+        titleBoard.position.set(group.x, 2, group.z + 8);
+        scene.add(titleBoard);
+
+        // Support post for title
+        const postGeometry = new THREE.CylinderGeometry(0.15, 0.15, 2, 8);
+        const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
+        const post = new THREE.Mesh(postGeometry, postMaterial);
+        post.position.set(group.x, 1, group.z + 8);
+        post.castShadow = true;
+        scene.add(post);
+
+        // Create skill buckets in and around the puddle
+        group.skills.forEach((skill, idx) => {
+            const angle = (idx / group.skills.length) * Math.PI * 2;
+            const radius = 3;
+            const x = group.x + Math.cos(angle) * radius;
+            const z = group.z + Math.sin(angle) * radius;
+
+            // Bucket
+            const bucketGeometry = new THREE.CylinderGeometry(0.8, 1, 2, 8);
+            const bucketMaterial = new THREE.MeshStandardMaterial({
+                color: group.color,
+                roughness: 0.5,
+                metalness: 0.3
+            });
+            const bucket = new THREE.Mesh(bucketGeometry, bucketMaterial);
+            bucket.position.set(x, 1, z);
+            bucket.castShadow = true;
+            bucket.receiveShadow = true;
+            bucket.userData = { type: 'movable', mass: 1 };
+            scene.add(bucket);
+            movableObjects.push(bucket);
+
+            // Label on bucket
+            const labelBoard = createTextBoard(skill, 1.5, 1, `#${group.color.toString(16).padStart(6, '0')}`, '#ffffff');
+            labelBoard.position.set(x, 1, z + 1.2);
+            scene.add(labelBoard);
+        });
+    });
+}
+
+function createCareerSteppingStones() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Create a stream (long water feature)
+    const streamGeometry = new THREE.PlaneGeometry(12, 40);
+    const streamMaterial = new THREE.MeshStandardMaterial({
+        color: isDark ? 0x1a3d5c : 0x5dade2,
+        roughness: 0.2,
+        metalness: 0.8,
+        transparent: true,
+        opacity: 0.7
+    });
+    const stream = new THREE.Mesh(streamGeometry, streamMaterial);
+    stream.rotation.x = -Math.PI / 2;
+    stream.position.set(-25, 0.02, -15);
+    stream.receiveShadow = true;
+    scene.add(stream);
+
+    // Title sign
+    const titleBoard = createTextBoard('CAREER JOURNEY', 10, 2.5, '#8b5a9e', '#ffffff');
+    titleBoard.position.set(-25, 3, 8);
+    scene.add(titleBoard);
+
+    // Support post
+    const postGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 8);
+    const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
+    const post = new THREE.Mesh(postGeometry, postMaterial);
+    post.position.set(-25, 1.5, 8);
+    post.castShadow = true;
+    scene.add(post);
+
+    // Job milestones as large stepping stones across the stream
+    const jobs = [
+        { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', z: -5 },
+        { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', z: -15 },
+        { company: 'TCS', role: 'Systems Engineer', years: '2017-2019', z: -25 }
+    ];
+
+    jobs.forEach((job, index) => {
+        const xOffset = (index % 2 === 0) ? -28 : -22;
+
+        // Large stepping stone
+        const stoneGeometry = new THREE.CylinderGeometry(3, 3.2, 0.8, 8);
+        const stoneMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8b7355,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const stone = new THREE.Mesh(stoneGeometry, stoneMaterial);
+        stone.position.set(xOffset, 0.4, job.z);
+        stone.castShadow = true;
+        stone.receiveShadow = true;
+        stone.userData = { type: 'static' };
+        scene.add(stone);
+        staticObjects.push(stone);
+
+        // Info carved into stone (board on top)
+        const infoBoard = createTextBoard(`${job.company}\n${job.role}\n${job.years}`, 5, 3, '#d4c4b0', '#2d2d2d');
+        infoBoard.rotation.x = -Math.PI / 2;
+        infoBoard.rotation.z = (Math.random() - 0.5) * 0.2;
+        infoBoard.position.set(xOffset, 0.81, job.z);
+        scene.add(infoBoard);
+    });
+}
+
+function createTrophyPodiums() {
+    // Trophy Podiums Area
+    const areaColor = 0xa87ab8;
+
+    // Title sign
+    const titleBoard = createTextBoard('ACHIEVEMENT PLAZA', 12, 3, '#a87ab8', '#ffffff');
+    titleBoard.position.set(-25, 3, -38);
+    scene.add(titleBoard);
+
+    // Support post
+    const postGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 8);
+    const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
+    const post = new THREE.Mesh(postGeometry, postMaterial);
+    post.position.set(-25, 1.5, -38);
+    post.castShadow = true;
+    scene.add(post);
+
+    // Awards as trophies on podiums
+    const awards = [
+        { title: 'Tech Showcase', org: 'Morgan Stanley', year: '2023-24', x: -30, z: -48 },
+        { title: 'Pat on Back', org: 'TIAA', year: '2020', x: -25, z: -48 },
+        { title: 'On the Spot', org: 'TCS', year: '2018', x: -20, z: -48 },
+        { title: 'Arctic Vault', org: 'GitHub', year: '2020', x: -25, z: -54 }
+    ];
+
+    awards.forEach(award => {
+        // Tall podium (static)
+        const pedestalGeometry = new THREE.CylinderGeometry(1.5, 2, 3, 8);
+        const pedestalMaterial = new THREE.MeshStandardMaterial({
+            color: areaColor,
+            roughness: 0.5,
+            metalness: 0.4
+        });
+        const pedestal = new THREE.Mesh(pedestalGeometry, pedestalMaterial);
+        pedestal.position.set(award.x, 1.5, award.z);
+        pedestal.castShadow = true;
+        pedestal.receiveShadow = true;
+        pedestal.userData = { type: 'static' };
+        scene.add(pedestal);
+        staticObjects.push(pedestal);
+
+        // Trophy (golden sphere on top)
+        const trophyGeometry = new THREE.SphereGeometry(0.7, 16, 16);
+        const trophyMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffd700,
+            roughness: 0.3,
+            metalness: 0.8
+        });
+        const trophy = new THREE.Mesh(trophyGeometry, trophyMaterial);
+        trophy.position.set(award.x, 3.5, award.z);
+        trophy.castShadow = true;
+        scene.add(trophy);
+
+        // Plaque at base
+        const plaqueBoard = createTextBoard(`${award.title}\n${award.org}\n${award.year}`, 3, 2, '#ffffff', '#a87ab8');
+        plaqueBoard.position.set(award.x, 0.5, award.z + 2.5);
+        scene.add(plaqueBoard);
+    });
+}
+
+function createTechFlowerGarden() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Create a small flower garden for extra tech/tools
+    const gardenPositions = [
+        { x: 10, z: 10 },
+        { x: -10, z: 10 }
+    ];
+
+    const flowers = ['Docker', 'Kubernetes', 'AWS', 'Microservices'];
+
+    gardenPositions.forEach((pos, idx) => {
+        flowers.forEach((flower, fIdx) => {
+            const angle = (fIdx / flowers.length) * Math.PI * 2;
+            const radius = 3;
+            const x = pos.x + Math.cos(angle) * radius;
+            const z = pos.z + Math.sin(angle) * radius;
+
+            // Flower pot (movable)
+            const potGeometry = new THREE.CylinderGeometry(0.5, 0.7, 1.2, 8);
+            const potMaterial = new THREE.MeshStandardMaterial({
+                color: 0xd2691e,
+                roughness: 0.8
+            });
+            const pot = new THREE.Mesh(potGeometry, potMaterial);
+            pot.position.set(x, 0.6, z);
+            pot.castShadow = true;
+            pot.receiveShadow = true;
+            pot.userData = { type: 'movable', mass: 0.8 };
+            scene.add(pot);
+            movableObjects.push(pot);
+
+            // Flower on top
+            const flowerGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+            const flowerMaterial = new THREE.MeshStandardMaterial({
+                color: [0xff69b4, 0xffa500, 0xff6347, 0x9370db][fIdx % 4],
+                roughness: 0.6
+            });
+            const flowerTop = new THREE.Mesh(flowerGeometry, flowerMaterial);
+            flowerTop.position.set(x, 1.6, z);
+            flowerTop.castShadow = true;
+            scene.add(flowerTop);
+
+            // Label
+            const labelBoard = createTextBoard(flower, 1.5, 0.8, '#ffffff', '#2d2d2d');
+            labelBoard.position.set(x, 0.6, z + 0.9);
+            scene.add(labelBoard);
+        });
+    });
+}
+
+function createContactLilyPond() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Create lily pond (circular water feature)
+    const pondGeometry = new THREE.CircleGeometry(10, 32);
+    const pondMaterial = new THREE.MeshStandardMaterial({
+        color: isDark ? 0x1a3d5c : 0x5dade2,
+        roughness: 0.2,
+        metalness: 0.8,
+        transparent: true,
+        opacity: 0.7
+    });
+    const pond = new THREE.Mesh(pondGeometry, pondMaterial);
+    pond.rotation.x = -Math.PI / 2;
+    pond.position.set(0, 0.02, -55);
+    pond.receiveShadow = true;
+    scene.add(pond);
+
+    // Title sign
+    const titleBoard = createTextBoard('WELCOME & CONTACT', 12, 3, '#5a3d54', '#ffffff');
+    titleBoard.position.set(0, 3, -40);
+    scene.add(titleBoard);
+
+    // Support post
+    const postGeometry = new THREE.CylinderGeometry(0.2, 0.2, 3, 8);
+    const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
+    const post = new THREE.Mesh(postGeometry, postMaterial);
+    post.position.set(0, 1.5, -40);
+    post.castShadow = true;
+    scene.add(post);
+
+    // Main info lily pad (center)
+    const mainLilyGeometry = new THREE.CylinderGeometry(3, 3, 0.3, 8);
+    const mainLilyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x90ee90,
+        roughness: 0.7
+    });
+    const mainLily = new THREE.Mesh(mainLilyGeometry, mainLilyMaterial);
+    mainLily.position.set(0, 0.15, -55);
+    mainLily.castShadow = true;
+    mainLily.receiveShadow = true;
+    scene.add(mainLily);
+
+    // Main info on lily pad
+    const mainBoard = createTextBoard('Divij Shrivastava\nSoftware Engineer\n8 Years Experience', 5, 3, '#e8f5e9', '#2d2d2d');
+    mainBoard.rotation.x = -Math.PI / 2;
+    mainBoard.position.set(0, 0.31, -55);
+    scene.add(mainBoard);
+
+    // Contact lily pads around the main one
+    const contactInfo = [
+        { text: 'Email:\ndivij.shrivastava\n@gmail.com', angle: 0 },
+        { text: 'Phone:\n+91\n8871962152', angle: Math.PI * 2 / 3 },
+        { text: 'Web:\ndivij.tech\nGitHub', angle: Math.PI * 4 / 3 }
+    ];
+
+    contactInfo.forEach(info => {
+        const radius = 6;
+        const x = Math.cos(info.angle) * radius;
+        const z = -55 + Math.sin(info.angle) * radius;
+
+        // Lily pad
+        const lilyGeometry = new THREE.CylinderGeometry(2, 2, 0.3, 8);
+        const lilyMaterial = new THREE.MeshStandardMaterial({
+            color: 0x90ee90,
+            roughness: 0.7
+        });
+        const lily = new THREE.Mesh(lilyGeometry, lilyMaterial);
+        lily.position.set(x, 0.15, z);
+        lily.castShadow = true;
+        lily.receiveShadow = true;
+        scene.add(lily);
+
+        // Contact info on lily pad
+        const contactBoard = createTextBoard(info.text, 3.5, 2, '#e8f5e9', '#2d2d2d');
+        contactBoard.rotation.x = -Math.PI / 2;
+        contactBoard.position.set(x, 0.31, z);
+        scene.add(contactBoard);
+    });
+
+    // Education lily pad
+    const eduLilyGeometry = new THREE.CylinderGeometry(2.5, 2.5, 0.3, 8);
+    const eduLilyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x90ee90,
+        roughness: 0.7
+    });
+    const eduLily = new THREE.Mesh(eduLilyGeometry, eduLilyMaterial);
+    eduLily.position.set(0, 0.15, -63);
+    eduLily.castShadow = true;
+    eduLily.receiveShadow = true;
+    scene.add(eduLily);
+
+    const eduBoard = createTextBoard('Education:\nB.E. Computer\nSRIT Jabalpur\n2012-2016', 4, 3, '#e8f5e9', '#2d2d2d');
+    eduBoard.rotation.x = -Math.PI / 2;
+    eduBoard.position.set(0, 0.31, -63);
+    scene.add(eduBoard);
+}
+
+function createInteractiveObjects() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Barrels scattered around
+    const barrelPositions = [
+        { x: 5, z: -5 }, { x: -5, z: -5 }, { x: 12, z: -12 },
+        { x: -12, z: -12 }, { x: 8, z: -30 }, { x: -8, z: -30 }
+    ];
+
+    barrelPositions.forEach(pos => {
+        const barrelGeometry = new THREE.CylinderGeometry(0.8, 0.8, 1.8, 12);
+        const barrelMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8b4513,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+        barrel.position.set(pos.x, 0.9, pos.z);
+        barrel.castShadow = true;
+        barrel.receiveShadow = true;
+        barrel.userData = { type: 'movable', mass: 2 };
+        scene.add(barrel);
+        movableObjects.push(barrel);
+    });
+
+    // Traffic cones
+    const conePositions = [
+        { x: 0, z: 5 }, { x: 3, z: 0 }, { x: -3, z: 0 },
+        { x: 15, z: -20 }, { x: -15, z: -20 }
+    ];
+
+    conePositions.forEach(pos => {
+        const coneGeometry = new THREE.ConeGeometry(0.5, 1.5, 8);
+        const coneMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff6600,
+            roughness: 0.6
+        });
+        const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+        cone.position.set(pos.x, 0.75, pos.z);
+        cone.castShadow = true;
+        cone.receiveShadow = true;
+        cone.userData = { type: 'movable', mass: 0.5 };
+        scene.add(cone);
+        movableObjects.push(cone);
+    });
+
+    // Benches (static obstacles)
+    const benchPositions = [
+        { x: 15, z: 5, rotation: Math.PI / 4 },
+        { x: -15, z: 5, rotation: -Math.PI / 4 }
+    ];
+
+    benchPositions.forEach(pos => {
+        const benchGroup = new THREE.Group();
+
+        // Bench seat
+        const seatGeometry = new THREE.BoxGeometry(3, 0.3, 1);
+        const seatMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8b4513,
+            roughness: 0.7
+        });
+        const seat = new THREE.Mesh(seatGeometry, seatMaterial);
+        seat.position.set(0, 0.8, 0);
+        seat.castShadow = true;
+        seat.receiveShadow = true;
+        benchGroup.add(seat);
+
+        // Bench back
+        const backGeometry = new THREE.BoxGeometry(3, 1, 0.2);
+        const back = new THREE.Mesh(backGeometry, seatMaterial);
+        back.position.set(0, 1.2, -0.4);
+        back.castShadow = true;
+        benchGroup.add(back);
+
+        // Legs
+        [-1, 1].forEach(xOffset => {
+            const legGeometry = new THREE.BoxGeometry(0.2, 0.8, 0.2);
+            const leg = new THREE.Mesh(legGeometry, seatMaterial);
+            leg.position.set(xOffset, 0.4, 0.3);
+            leg.castShadow = true;
+            benchGroup.add(leg);
+
+            const leg2 = new THREE.Mesh(legGeometry, seatMaterial);
+            leg2.position.set(xOffset, 0.4, -0.3);
+            leg2.castShadow = true;
+            benchGroup.add(leg2);
+        });
+
+        benchGroup.position.set(pos.x, 0, pos.z);
+        benchGroup.rotation.y = pos.rotation;
+        benchGroup.userData = { type: 'static' };
+        scene.add(benchGroup);
+        staticObjects.push(benchGroup);
+    });
 }
 
 function createCar() {
@@ -247,230 +764,85 @@ function createCar() {
     scene.add(car);
 }
 
-function createSectionPlatforms() {
-    const sections = [
-        { x: -15, z: -10, data: 'experience', color: 0x8b5a9e, label: 'EXPERIENCE\n8 Years' },
-        { x: 15, z: -10, data: 'skills', color: 0x6d4579, label: 'SKILLS\nTechnologies' },
-        { x: -15, z: -35, data: 'awards', color: 0xa87ab8, label: 'AWARDS\nRecognition' },
-        { x: 15, z: -35, data: 'about', color: 0x5a3d54, label: 'ABOUT\nMe' }
-    ];
-
-    sections.forEach(section => {
-        // Platform
-        const platformGeometry = new THREE.BoxGeometry(12, 0.5, 12);
-        const platformMaterial = new THREE.MeshStandardMaterial({
-            color: section.color,
-            roughness: 0.4,
-            metalness: 0.5
-        });
-        const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-        platform.position.set(section.x, 0.25, section.z);
-        platform.receiveShadow = true;
-        platform.castShadow = true;
-        platform.userData = { type: section.data, label: section.label };
-        scene.add(platform);
-        sectionPlatforms.push(platform);
-
-        // Border/frame around platform
-        const borderGeometry = new THREE.BoxGeometry(12.5, 0.3, 12.5);
-        const borderMaterial = new THREE.MeshStandardMaterial({
-            color: section.color,
-            roughness: 0.6,
-            metalness: 0.8,
-            emissive: section.color,
-            emissiveIntensity: 0.2
-        });
-        const border = new THREE.Mesh(borderGeometry, borderMaterial);
-        border.position.set(section.x, 0.05, section.z);
-        border.receiveShadow = true;
-        scene.add(border);
-
-        // Text label on platform using canvas texture
-        createPlatformText(section.label, section.x, section.z);
-    });
-}
-
-function createPlatformText(text, x, z) {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 512;
-    canvas.height = 512;
-
-    // Background
-    context.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Text
-    context.font = 'bold 60px Inter';
-    context.fillStyle = '#2d2d2d';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-
-    const lines = text.split('\n');
-    lines.forEach((line, index) => {
-        const y = canvas.height / 2 + (index - lines.length / 2 + 0.5) * 80;
-        context.fillText(line, canvas.width / 2, y);
-    });
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.MeshStandardMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 0.95
-    });
-
-    const geometry = new THREE.PlaneGeometry(10, 10);
-    const plane = new THREE.Mesh(geometry, material);
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.set(x, 0.51, z);
-    scene.add(plane);
-}
-
 function createEnvironment() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Trees scattered around
+    // Trees scattered around the edges (static obstacles)
     const treePositions = [
-        { x: -25, z: 5 }, { x: 25, z: 5 }, { x: -30, z: -20 },
-        { x: 30, z: -20 }, { x: 0, z: -50 }, { x: -35, z: -45 },
-        { x: 35, z: -45 }, { x: -40, z: 10 }, { x: 40, z: 10 },
-        { x: -10, z: 20 }, { x: 10, z: 20 }, { x: 0, z: -60 }
+        { x: -35, z: 10 }, { x: -35, z: -10 }, { x: -35, z: -30 }, { x: -35, z: -50 },
+        { x: 35, z: 10 }, { x: 35, z: -10 }, { x: 35, z: -30 }, { x: 35, z: -50 },
+        { x: -10, z: 18 }, { x: 10, z: 18 }, { x: 0, z: -70 },
+        // Add more trees for better boundaries
+        { x: -18, z: -35 }, { x: 18, z: -35 }
     ];
 
     treePositions.forEach(pos => {
+        const treeGroup = new THREE.Group();
+
         // Tree trunk
-        const trunkGeometry = new THREE.CylinderGeometry(0.4, 0.5, 3, 8);
+        const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.6, 4, 8);
         const trunkMaterial = new THREE.MeshStandardMaterial({
             color: isDark ? 0x4a3428 : 0x6b4423,
             roughness: 0.9
         });
         const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-        trunk.position.set(pos.x, 1.5, pos.z);
+        trunk.position.set(0, 2, 0);
         trunk.castShadow = true;
         trunk.receiveShadow = true;
-        scene.add(trunk);
+        treeGroup.add(trunk);
 
-        // Tree foliage (sphere)
-        const foliageGeometry = new THREE.SphereGeometry(2, 8, 8);
+        // Tree foliage
+        const foliageGeometry = new THREE.SphereGeometry(2.5, 8, 8);
         const foliageMaterial = new THREE.MeshStandardMaterial({
             color: isDark ? 0x2d5a2d : 0x4a9d4a,
             roughness: 0.8
         });
         const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
-        foliage.position.set(pos.x, 4, pos.z);
+        foliage.position.set(0, 5, 0);
         foliage.castShadow = true;
         foliage.receiveShadow = true;
-        scene.add(foliage);
+        treeGroup.add(foliage);
+
+        treeGroup.position.set(pos.x, 0, pos.z);
+        treeGroup.userData = { type: 'static', radius: 3 };
+        scene.add(treeGroup);
+        staticObjects.push(treeGroup);
     });
 
-    // Decorative pillars/posts around sections
-    const pillarPositions = [
-        { x: -20, z: -5 }, { x: -10, z: -5 }, { x: 10, z: -5 }, { x: 20, z: -5 },
-        { x: -20, z: -15 }, { x: 20, z: -15 },
-        { x: -20, z: -30 }, { x: -10, z: -30 }, { x: 10, z: -30 }, { x: 20, z: -30 },
-        { x: -20, z: -40 }, { x: 20, z: -40 }
+    // Decorative rocks (static)
+    const rockPositions = [
+        { x: 8, z: -48 }, { x: -8, z: -48 }, { x: 12, z: -55 }
     ];
 
-    pillarPositions.forEach(pos => {
-        const pillarGeometry = new THREE.CylinderGeometry(0.3, 0.3, 4, 8);
-        const pillarMaterial = new THREE.MeshStandardMaterial({
-            color: isDark ? 0x3a3a3a : 0xb8b0c0,
-            roughness: 0.6,
-            metalness: 0.4
+    rockPositions.forEach(pos => {
+        const rockGeometry = new THREE.DodecahedronGeometry(1.2, 0);
+        const rockMaterial = new THREE.MeshStandardMaterial({
+            color: 0x808080,
+            roughness: 0.9,
+            metalness: 0.1
         });
-        const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        pillar.position.set(pos.x, 2, pos.z);
-        pillar.castShadow = true;
-        pillar.receiveShadow = true;
-        scene.add(pillar);
-
-        // Top sphere decoration
-        const topGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-        const topMaterial = new THREE.MeshStandardMaterial({
-            color: isDark ? 0x6d4579 : 0x8b5a9e,
-            roughness: 0.4,
-            metalness: 0.6,
-            emissive: isDark ? 0x6d4579 : 0x8b5a9e,
-            emissiveIntensity: 0.2
-        });
-        const top = new THREE.Mesh(topGeometry, topMaterial);
-        top.position.set(pos.x, 4.5, pos.z);
-        top.castShadow = true;
-        scene.add(top);
+        const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+        rock.position.set(pos.x, 0.6, pos.z);
+        rock.rotation.set(Math.random(), Math.random(), Math.random());
+        rock.castShadow = true;
+        rock.receiveShadow = true;
+        rock.userData = { type: 'static', radius: 1.5 };
+        scene.add(rock);
+        staticObjects.push(rock);
     });
 
-    // Boundary markers at edges
-    const boundaryPositions = [
-        // Front
-        { x: -50, z: 20 }, { x: -30, z: 20 }, { x: -10, z: 20 },
-        { x: 10, z: 20 }, { x: 30, z: 20 }, { x: 50, z: 20 },
-        // Back
-        { x: -50, z: -70 }, { x: -30, z: -70 }, { x: -10, z: -70 },
-        { x: 10, z: -70 }, { x: 30, z: -70 }, { x: 50, z: -70 },
-        // Left
-        { x: -50, z: 0 }, { x: -50, z: -20 }, { x: -50, z: -40 }, { x: -50, z: -60 },
-        // Right
-        { x: 50, z: 0 }, { x: 50, z: -20 }, { x: 50, z: -40 }, { x: 50, z: -60 }
-    ];
-
-    boundaryPositions.forEach(pos => {
-        const boundaryGeometry = new THREE.BoxGeometry(1.5, 2, 1.5);
-        const boundaryMaterial = new THREE.MeshStandardMaterial({
-            color: isDark ? 0x5a3d54 : 0xa87ab8,
-            roughness: 0.5,
-            metalness: 0.5
-        });
-        const boundary = new THREE.Mesh(boundaryGeometry, boundaryMaterial);
-        boundary.position.set(pos.x, 1, pos.z);
-        boundary.castShadow = true;
-        boundary.receiveShadow = true;
-        scene.add(boundary);
-    });
-
-    // Small decorative cubes scattered around
-    const cubePositions = [
-        { x: -5, z: 0, size: 0.8 }, { x: 5, z: 0, size: 0.6 },
-        { x: -8, z: -22, size: 0.7 }, { x: 8, z: -22, size: 0.9 },
-        { x: 0, z: -45, size: 0.5 }, { x: -25, z: -12, size: 0.6 },
-        { x: 25, z: -12, size: 0.8 }, { x: -25, z: -38, size: 0.7 },
-        { x: 25, z: -38, size: 0.6 }
-    ];
-
-    cubePositions.forEach(pos => {
-        const cubeGeometry = new THREE.BoxGeometry(pos.size, pos.size, pos.size);
-        const cubeMaterial = new THREE.MeshStandardMaterial({
-            color: isDark ? 0x4a3a4a : 0xc0b0d0,
-            roughness: 0.6,
-            metalness: 0.3
-        });
-        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        cube.position.set(pos.x, pos.size / 2, pos.z);
-        cube.rotation.y = Math.random() * Math.PI;
-        cube.castShadow = true;
-        cube.receiveShadow = true;
-        scene.add(cube);
-    });
-
-    // Road/path markers between sections
-    const pathMarkers = [
-        { x: 0, z: 0 }, { x: 0, z: -5 }, { x: 0, z: -10 },
-        { x: 0, z: -15 }, { x: 0, z: -20 }, { x: 0, z: -25 },
-        { x: 0, z: -30 }, { x: 0, z: -35 }, { x: 0, z: -40 }
-    ];
-
-    pathMarkers.forEach(pos => {
-        const markerGeometry = new THREE.BoxGeometry(1, 0.1, 1);
+    // Path markers
+    for (let z = 10; z > -70; z -= 8) {
+        const markerGeometry = new THREE.BoxGeometry(2, 0.1, 2);
         const markerMaterial = new THREE.MeshStandardMaterial({
-            color: isDark ? 0x6d6d6d : 0xffffff,
-            roughness: 0.8,
-            transparent: true,
-            opacity: 0.6
+            color: isDark ? 0x444444 : 0xcccccc,
+            roughness: 0.8
         });
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        marker.position.set(pos.x, 0.06, pos.z);
+        marker.position.set(0, 0.06, z);
         marker.receiveShadow = true;
         scene.add(marker);
-    });
+    }
 }
 
 function addEventListeners() {
@@ -486,12 +858,6 @@ function addEventListeners() {
 
     document.addEventListener('keyup', (e) => {
         keysPressed[e.code] = false;
-    });
-
-    // Modal close
-    document.getElementById('closeModal').addEventListener('click', closeModal);
-    document.getElementById('contentModal').addEventListener('click', (e) => {
-        if (e.target.id === 'contentModal') closeModal();
     });
 
     // Theme toggle
@@ -514,59 +880,25 @@ function toggleTheme() {
     scene.background = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
     scene.fog.color = new THREE.Color(isDark ? 0x1a1a1a : 0xe8e4f0);
 
-    // Update ground color
+    // Update ground to grass color
     scene.children.forEach(child => {
         if (child.geometry && child.geometry.type === 'PlaneGeometry' && child.position.y === 0) {
-            child.material.color.setHex(isDark ? 0x242424 : 0xd8d0dc);
-        }
-        // Update tree colors
-        if (child.geometry && child.geometry.type === 'CylinderGeometry' && child.position.y === 1.5) {
-            child.material.color.setHex(isDark ? 0x4a3428 : 0x6b4423);
-        }
-        if (child.geometry && child.geometry.type === 'SphereGeometry' && child.position.y > 3) {
-            if (child.position.y < 4.2) { // Tree foliage
-                child.material.color.setHex(isDark ? 0x2d5a2d : 0x4a9d4a);
-            } else if (child.position.y > 4.2) { // Pillar tops
-                child.material.color.setHex(isDark ? 0x6d4579 : 0x8b5a9e);
-                child.material.emissive.setHex(isDark ? 0x6d4579 : 0x8b5a9e);
-            }
-        }
-        // Update pillars
-        if (child.geometry && child.geometry.type === 'CylinderGeometry' && child.position.y === 2) {
-            child.material.color.setHex(isDark ? 0x3a3a3a : 0xb8b0c0);
-        }
-        // Update boundary markers
-        if (child.geometry && child.geometry.type === 'BoxGeometry' && child.position.y === 1 &&
-            (Math.abs(child.position.x) >= 50 || Math.abs(child.position.z) >= 60)) {
-            child.material.color.setHex(isDark ? 0x5a3d54 : 0xa87ab8);
-        }
-        // Update decorative cubes
-        if (child.geometry && child.geometry.type === 'BoxGeometry' && child.position.y < 0.5 && child.position.y > 0.2) {
-            child.material.color.setHex(isDark ? 0x4a3a4a : 0xc0b0d0);
-        }
-        // Update path markers
-        if (child.geometry && child.geometry.type === 'BoxGeometry' && child.position.y === 0.06) {
-            child.material.color.setHex(isDark ? 0x6d6d6d : 0xffffff);
+            child.material.color.setHex(isDark ? 0x1a2a1a : 0x7cb87c);
         }
     });
-}
-
-function showModal(dataKey) {
-    const modal = document.getElementById('contentModal');
-    const content = document.getElementById('modalContent');
-    content.innerHTML = portfolioData[dataKey].content;
-    modal.classList.add('active');
-}
-
-function closeModal() {
-    const modal = document.getElementById('contentModal');
-    modal.classList.remove('active');
 }
 
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function checkCollision(pos1, radius1, pos2, radius2) {
+    const dx = pos1.x - pos2.x;
+    const dz = pos1.z - pos2.z;
+    const distance = Math.sqrt(dx * dx + dz * dz);
+    return distance < (radius1 + radius2);
 }
 
 function updateCar() {
@@ -594,9 +926,70 @@ function updateCar() {
         }
     }
 
-    // Apply movement
-    car.position.x += Math.sin(carRotation) * carSpeed;
-    car.position.z += Math.cos(carRotation) * carSpeed;
+    // Update engine sound based on speed
+    updateEngineSound(carSpeed);
+
+    // Calculate new position
+    const newX = car.position.x + Math.sin(carRotation) * carSpeed;
+    const newZ = car.position.z + Math.cos(carRotation) * carSpeed;
+    const carRadius = 2;
+
+    let canMove = true;
+    let collisionIntensity = 0;
+
+    // Check collision with static objects (trees, rocks, etc.)
+    for (const obj of staticObjects) {
+        const objRadius = obj.userData.radius || 2;
+        if (checkCollision({ x: newX, z: newZ }, carRadius, obj.position, objRadius)) {
+            canMove = false;
+            collisionIntensity = Math.abs(carSpeed);
+            playCollisionSound(collisionIntensity);
+            carSpeed *= -0.3; // Bounce back
+            break;
+        }
+    }
+
+    // Check collision with movable objects and push them
+    for (const obj of movableObjects) {
+        const objRadius = 1;
+        if (checkCollision({ x: newX, z: newZ }, carRadius, obj.position, objRadius)) {
+            playObjectHitSound();
+
+            // Calculate push direction
+            const pushDir = {
+                x: obj.position.x - newX,
+                z: obj.position.z - newZ
+            };
+            const pushDist = Math.sqrt(pushDir.x * pushDir.x + pushDir.z * pushDir.z);
+            pushDir.x /= pushDist;
+            pushDir.z /= pushDist;
+
+            // Push the object based on car speed and object mass
+            const pushForce = Math.abs(carSpeed) * 3 / (obj.userData.mass || 1);
+            obj.position.x += pushDir.x * pushForce;
+            obj.position.z += pushDir.z * pushForce;
+
+            // Add slight rotation for realism
+            obj.rotation.y += pushForce * 0.5;
+
+            // Add bounce effect
+            if (!obj.userData.bouncing) {
+                obj.userData.bouncing = true;
+                obj.userData.originalY = obj.position.y;
+                obj.userData.bounceTime = 0;
+            }
+
+            // Slow down car slightly
+            carSpeed *= 0.8;
+        }
+    }
+
+    // Apply movement if no collision with static objects
+    if (canMove) {
+        car.position.x = newX;
+        car.position.z = newZ;
+    }
+
     car.rotation.y = carRotation;
 
     // Keep car within bounds
@@ -611,35 +1004,6 @@ function updateCar() {
     camera.position.y = car.position.y + rotatedOffset.y;
     camera.position.z = car.position.z + rotatedOffset.z;
     camera.lookAt(car.position);
-
-    // Check for section proximity
-    let nearestSection = null;
-    let minDist = Infinity;
-
-    sectionPlatforms.forEach(platform => {
-        const dist = car.position.distanceTo(platform.position);
-        if (dist < 8 && dist < minDist) {
-            minDist = dist;
-            nearestSection = platform;
-        }
-    });
-
-    // Update interaction prompt
-    const prompt = document.getElementById('interactionPrompt');
-    if (nearestSection && nearestSection !== currentSection) {
-        currentSection = nearestSection;
-        prompt.classList.add('visible');
-        prompt.querySelector('p').innerHTML = `<strong>${currentSection.userData.label.split('\n')[0]}</strong><br>Press <strong>E</strong> to view details`;
-    } else if (!nearestSection) {
-        currentSection = null;
-        prompt.classList.remove('visible');
-    }
-
-    // Interaction key
-    if (keysPressed['KeyE'] && currentSection) {
-        showModal(currentSection.userData.type);
-        keysPressed['KeyE'] = false; // Prevent repeated triggers
-    }
 }
 
 function animate() {
@@ -653,6 +1017,22 @@ function animate() {
                          (keysPressed['KeyD'] || keysPressed['ArrowRight']) ? -0.05 : 0;
         carBody.rotation.z += (targetTilt - carBody.rotation.z) * 0.1;
     }
+
+    // Update bouncing objects
+    movableObjects.forEach(obj => {
+        if (obj.userData.bouncing) {
+            obj.userData.bounceTime += 0.1;
+            const bounceHeight = Math.sin(obj.userData.bounceTime * 3) * 0.3;
+
+            if (bounceHeight < 0.01 && obj.userData.bounceTime > 1) {
+                // End bounce
+                obj.position.y = obj.userData.originalY;
+                obj.userData.bouncing = false;
+            } else {
+                obj.position.y = obj.userData.originalY + Math.max(0, bounceHeight);
+            }
+        }
+    });
 
     renderer.render(scene, camera);
 }
