@@ -35,6 +35,8 @@ let collectedSkills = new Set();
 // Billboard tracking for zoom
 let billboards = [];
 let isZoomed = false;
+let nearestBillboard = null;
+let nearestDistance = Infinity;
 
 // Audio context and sounds
 let audioContext;
@@ -1002,9 +1004,13 @@ function addEventListeners() {
     document.addEventListener('keydown', (e) => {
         keysPressed[e.code] = true;
 
-        // Zoom functionality
-        if (e.code === 'KeyZ' && !isZoomed) {
-            zoomToNearestBillboard();
+        // Zoom functionality (toggle)
+        if (e.code === 'KeyZ') {
+            if (isZoomed) {
+                closeZoom();
+            } else {
+                zoomToNearestBillboard();
+            }
         }
 
         // Close zoom with ESC
@@ -1016,9 +1022,6 @@ function addEventListeners() {
     document.addEventListener('keyup', (e) => {
         keysPressed[e.code] = false;
     });
-
-    // Close zoom button
-    document.getElementById('closeZoom').addEventListener('click', closeZoom);
 
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
@@ -1039,66 +1042,99 @@ function addEventListeners() {
     window.addEventListener('resize', onWindowResize);
 }
 
-function zoomToNearestBillboard() {
-    if (billboards.length === 0) {
-        console.log('No billboards available');
+function updateZoomBubble() {
+    if (billboards.length === 0 || isZoomed) {
+        hideBubble();
         return;
     }
 
     // Find nearest billboard
-    let nearestBillboard = null;
-    let minDistance = Infinity;
+    nearestBillboard = null;
+    nearestDistance = Infinity;
 
     billboards.forEach(billboard => {
         const distance = car.position.distanceTo(billboard.position);
-        if (distance < minDistance) {
-            minDistance = distance;
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
             nearestBillboard = billboard;
         }
     });
 
-    console.log(`Nearest billboard distance: ${minDistance.toFixed(2)}`);
-
-    if (nearestBillboard && minDistance < 50) { // Increased range to 50 units
-        showZoom(nearestBillboard.userData.billboardText);
+    // Show bubble if within range
+    if (nearestBillboard && nearestDistance < 15) {
+        showProximityBubble(nearestBillboard);
     } else {
-        // Show temporary message
-        showTemporaryMessage(`Move closer to a billboard (${minDistance.toFixed(1)} units away)`);
+        hideBubble();
     }
 }
 
-function showTemporaryMessage(message) {
-    const instructions = document.querySelector('.instructions p');
-    const originalText = instructions.textContent;
-    instructions.textContent = message;
-    instructions.style.color = 'var(--primary-color)';
+function showProximityBubble(billboard) {
+    const bubble = document.getElementById('zoomBubble');
+    const bubbleText = document.querySelector('.zoom-bubble-text');
 
-    setTimeout(() => {
-        instructions.textContent = originalText;
-        instructions.style.color = '';
-    }, 2000);
+    // Get screen position
+    const vector = new THREE.Vector3();
+    billboard.getWorldPosition(vector);
+    vector.project(camera);
+
+    const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
+    const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+    bubble.style.left = screenX + 'px';
+    bubble.style.top = screenY + 'px';
+    bubble.style.transform = 'translate(-50%, -50%)';
+
+    bubbleText.textContent = 'Press Z to view';
+
+    bubble.classList.add('visible', 'small');
+    bubble.classList.remove('expanding');
 }
 
-function showZoom(text) {
-    isZoomed = true;
-    const zoomModal = document.getElementById('zoomModal');
-    const zoomText = document.getElementById('zoomText');
+function hideBubble() {
+    const bubble = document.getElementById('zoomBubble');
+    bubble.classList.remove('visible', 'small', 'expanding');
+}
 
-    zoomText.innerHTML = text.split('\n').map(line => {
-        // Make the first line (title) bold
-        if (text.indexOf(line) === 0) {
+function zoomToNearestBillboard() {
+    if (!nearestBillboard || nearestDistance >= 15) {
+        return;
+    }
+
+    // Expand the bubble and show content
+    const bubble = document.getElementById('zoomBubble');
+    const bubbleText = document.querySelector('.zoom-bubble-text');
+
+    isZoomed = true;
+
+    // Center the bubble
+    bubble.style.left = '50%';
+    bubble.style.top = '50%';
+    bubble.style.transform = 'translate(-50%, -50%)';
+
+    // Format text
+    const text = nearestBillboard.userData.billboardText;
+    const formattedText = text.split('\n').map((line, index) => {
+        if (index === 0) {
             return `<strong>${line}</strong>`;
         }
         return line;
     }).join('<br>');
 
-    zoomModal.classList.add('active');
+    // Expand animation
+    bubble.classList.remove('small');
+    bubble.classList.add('expanding');
+
+    // Update text after a brief delay for smooth animation
+    setTimeout(() => {
+        bubbleText.innerHTML = formattedText;
+    }, 150);
 }
 
 function closeZoom() {
     isZoomed = false;
-    const zoomModal = document.getElementById('zoomModal');
-    zoomModal.classList.remove('active');
+    hideBubble();
+    // Update bubble immediately to show "Press Z" again if still in range
+    setTimeout(() => updateZoomBubble(), 100);
 }
 
 function toggleTheme() {
@@ -1267,8 +1303,12 @@ function updateCar() {
 
     car.rotation.y = carRotation;
 
-    // Terrain following for mountains
+    // Advanced terrain following for mountains (GTA 5 style)
     let targetY = 0; // Ground level
+    let terrainNormalX = 0;
+    let terrainNormalZ = 0;
+    let onMountain = false;
+
     scene.children.forEach(child => {
         if (child.userData.type === 'rideable_mountain') {
             const distX = car.position.x - child.position.x;
@@ -1277,17 +1317,43 @@ function updateCar() {
 
             // Check if car is over the mountain (within radius)
             if (dist2D < 6) { // Base radius of mountain
+                onMountain = true;
+
                 // Calculate height based on distance from center
                 // Mountains are roughly 3.7 units tall at center
                 const heightFactor = Math.max(0, 1 - dist2D / 6);
                 const mountainHeight = 3.7 * heightFactor;
                 targetY = Math.max(targetY, mountainHeight);
+
+                // Calculate slope for car tilting
+                // Slope increases as we move away from center
+                if (dist2D > 0.1) {
+                    const slopeFactor = (1 - heightFactor) * 0.5; // Max tilt of ~28 degrees
+                    terrainNormalX = -(distX / dist2D) * slopeFactor;
+                    terrainNormalZ = -(distZ / dist2D) * slopeFactor;
+                }
             }
         }
     });
 
-    // Smoothly adjust car height
-    car.position.y += (targetY - car.position.y) * 0.1;
+    // Smoothly adjust car height with realistic acceleration
+    const heightDiff = targetY - car.position.y;
+    const lerpSpeed = onMountain ? 0.15 : 0.2; // Slightly slower when on mountain for realism
+    car.position.y += heightDiff * lerpSpeed;
+
+    // Apply car tilting based on terrain (GTA 5 style)
+    const targetTiltX = terrainNormalX;
+    const targetTiltZ = terrainNormalZ;
+
+    // Smoothly interpolate car tilt
+    if (!car.userData.tiltX) car.userData.tiltX = 0;
+    if (!car.userData.tiltZ) car.userData.tiltZ = 0;
+
+    car.userData.tiltX += (targetTiltX - car.userData.tiltX) * 0.1;
+    car.userData.tiltZ += (targetTiltZ - car.userData.tiltZ) * 0.1;
+
+    car.rotation.x = car.userData.tiltX;
+    car.rotation.z = car.userData.tiltZ;
 
     // Keep car within bounds
     const maxDist = 90;
@@ -1339,6 +1405,9 @@ function animate() {
             }
         }
     });
+
+    // Update zoom bubble position and visibility
+    updateZoomBubble();
 
     renderer.render(scene, camera);
 }

@@ -775,6 +775,65 @@ body {
     }
 }
 
+/* Zoom Proximity Bubble */
+.zoom-bubble {
+    position: fixed;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.zoom-bubble.visible {
+    display: flex;
+}
+
+.zoom-bubble.small {
+    background: radial-gradient(circle, rgba(139, 90, 158, 0.95) 0%, rgba(107, 69, 121, 0.9) 100%);
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    box-shadow: 0 8px 32px rgba(139, 90, 158, 0.5);
+    animation: bubblePulse 2s ease-in-out infinite;
+}
+
+.zoom-bubble.expanding {
+    background: radial-gradient(circle, rgba(139, 90, 158, 0.98) 0%, rgba(107, 69, 121, 0.95) 100%);
+    border-radius: 20px;
+    width: 600px;
+    height: 400px;
+    box-shadow: 0 20px 60px rgba(139, 90, 158, 0.6);
+    animation: none;
+}
+
+.zoom-bubble-text {
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    padding: 1rem;
+    transition: all 0.3s ease;
+}
+
+.zoom-bubble.expanding .zoom-bubble-text {
+    font-size: 1.5rem;
+    line-height: 2;
+    white-space: pre-wrap;
+}
+
+@keyframes bubblePulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 8px 32px rgba(139, 90, 158, 0.5);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 12px 40px rgba(139, 90, 158, 0.7);
+    }
+}
+
 /* Zoom Modal for Billboards */
 .zoom-modal {
     position: fixed;
