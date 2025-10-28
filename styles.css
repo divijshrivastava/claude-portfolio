@@ -774,3 +774,101 @@ body {
         transform: scale(1.2);
     }
 }
+
+/* Zoom Modal for Billboards */
+.zoom-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+.zoom-modal.active {
+    display: flex;
+}
+
+.zoom-content {
+    background: var(--overlay-bg);
+    border-radius: 1rem;
+    padding: 3rem;
+    max-width: 90%;
+    max-height: 90%;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: zoomIn 0.3s ease;
+}
+
+.close-zoom {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    z-index: 10;
+}
+
+.close-zoom:hover {
+    background: var(--primary-dark);
+    transform: rotate(90deg);
+}
+
+.zoom-text {
+    font-size: 1.5rem;
+    line-height: 2;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    text-align: center;
+}
+
+.zoom-text strong {
+    color: var(--primary-color);
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.zoom-hint {
+    text-align: center;
+    color: var(--text-secondary);
+    margin-top: 2rem;
+    font-size: 0.875rem;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes zoomIn {
+    from {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

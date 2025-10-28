@@ -31,10 +31,12 @@
             <div class="controls-info">
                 <h3>Controls:</h3>
                 <ul>
-                    <li><strong>W/↑</strong> - Accelerate</li>
-                    <li><strong>S/↓</strong> - Brake / Reverse</li>
+                    <li><strong>W/↑</strong> - Move Forward</li>
+                    <li><strong>S/↓</strong> - Move Backward</li>
                     <li><strong>A/←</strong> - Turn Left</li>
                     <li><strong>D/→</strong> - Turn Right</li>
+                    <li><strong>Scroll</strong> - Adjust Camera Angle</li>
+                    <li><strong>Z</strong> - Zoom to Nearest Billboard</li>
                 </ul>
             </div>
             <button class="start-button" id="startButton">Start Driving</button>
@@ -76,7 +78,7 @@
 
         <!-- Instructions -->
         <div class="instructions">
-            <p><strong>Drive:</strong> W/A/S/D or Arrows | <strong>Explore:</strong> All info is visible in the playground!</p>
+            <p><strong>Drive:</strong> W/A/S/D or Arrows | <strong>Zoom:</strong> Press Z | <strong>Scroll:</strong> Camera Angle</p>
         </div>
 
         <!-- Social Links -->
@@ -108,6 +110,15 @@
     <div class="content-modal" id="contentModal">
         <button class="close-modal" id="closeModal">&times;</button>
         <div class="modal-content" id="modalContent"></div>
+    </div>
+
+    <!-- Zoom Modal for Billboards -->
+    <div class="zoom-modal" id="zoomModal">
+        <div class="zoom-content">
+            <button class="close-zoom" id="closeZoom">&times;</button>
+            <div class="zoom-text" id="zoomText"></div>
+            <p class="zoom-hint">Press Z or ESC to close</p>
+        </div>
     </div>
 
     <!-- Three.js Library -->

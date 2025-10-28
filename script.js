@@ -12,7 +12,7 @@ let carRotation = 0;
 const maxSpeed = 0.3;
 const acceleration = 0.01;
 const deceleration = 0.005;
-const turnSpeed = 0.03;
+const turnSpeed = 0.015; // Reduced from 0.03 for slower rotation
 
 // Camera control variables
 let cameraAngle = Math.PI / 3; // Initial angle (60 degrees from horizontal)
@@ -31,6 +31,10 @@ let soundsLoaded = false;
 // Points system
 let points = 0;
 let collectedSkills = new Set();
+
+// Billboard tracking for zoom
+let billboards = [];
+let isZoomed = false;
 
 // Audio context and sounds
 let audioContext;
@@ -322,7 +326,7 @@ function collectSkill(skillObj) {
     return true;
 }
 
-function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d') {
+function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '#2d2d2d', isBillboard = false) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 1024;
@@ -361,6 +365,14 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
     const board = new THREE.Mesh(geometry, material);
     board.castShadow = true;
     board.receiveShadow = true;
+
+    // Store billboard data for zoom functionality
+    if (isBillboard) {
+        board.userData.isBillboard = true;
+        board.userData.billboardText = text;
+        billboards.push(board);
+    }
+
     return board;
 }
 
@@ -409,7 +421,7 @@ function createSkillBuckets() {
         scene.add(puddle);
 
         // Title sign above puddle
-        const titleBoard = createTextBoard(group.title, 8, 2, '#ffffff', '#2d2d2d');
+        const titleBoard = createTextBoard(group.title, 8, 2, '#ffffff', '#2d2d2d', true);
         titleBoard.position.set(group.x, 2, group.z + 8);
         scene.add(titleBoard);
 
@@ -470,7 +482,7 @@ function createCareerSteppingStones() {
     scene.add(stream);
 
     // Title sign
-    const titleBoard = createTextBoard('CAREER JOURNEY', 10, 2.5, '#8b5a9e', '#ffffff');
+    const titleBoard = createTextBoard('CAREER JOURNEY', 10, 2.5, '#8b5a9e', '#ffffff', true);
     titleBoard.position.set(-25, 3, 8);
     scene.add(titleBoard);
 
@@ -521,7 +533,7 @@ function createTrophyPodiums() {
     const areaColor = 0xa87ab8;
 
     // Title sign
-    const titleBoard = createTextBoard('ACHIEVEMENT PLAZA', 12, 3, '#a87ab8', '#ffffff');
+    const titleBoard = createTextBoard('ACHIEVEMENT PLAZA', 12, 3, '#a87ab8', '#ffffff', true);
     titleBoard.position.set(-25, 3, -38);
     scene.add(titleBoard);
 
@@ -646,7 +658,7 @@ function createContactLilyPond() {
     scene.add(pond);
 
     // Title sign
-    const titleBoard = createTextBoard('WELCOME & CONTACT', 12, 3, '#5a3d54', '#ffffff');
+    const titleBoard = createTextBoard('WELCOME & CONTACT', 12, 3, '#5a3d54', '#ffffff', true);
     titleBoard.position.set(0, 3, -40);
     scene.add(titleBoard);
 
@@ -966,11 +978,24 @@ function addEventListeners() {
     // Keyboard controls
     document.addEventListener('keydown', (e) => {
         keysPressed[e.code] = true;
+
+        // Zoom functionality
+        if (e.code === 'KeyZ' && !isZoomed) {
+            zoomToNearestBillboard();
+        }
+
+        // Close zoom with ESC
+        if (e.code === 'Escape' && isZoomed) {
+            closeZoom();
+        }
     });
 
     document.addEventListener('keyup', (e) => {
         keysPressed[e.code] = false;
     });
+
+    // Close zoom button
+    document.getElementById('closeZoom').addEventListener('click', closeZoom);
 
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
@@ -989,6 +1014,48 @@ function addEventListeners() {
 
     // Window resize
     window.addEventListener('resize', onWindowResize);
+}
+
+function zoomToNearestBillboard() {
+    if (billboards.length === 0) return;
+
+    // Find nearest billboard
+    let nearestBillboard = null;
+    let minDistance = Infinity;
+
+    billboards.forEach(billboard => {
+        const distance = car.position.distanceTo(billboard.position);
+        if (distance < minDistance) {
+            minDistance = distance;
+            nearestBillboard = billboard;
+        }
+    });
+
+    if (nearestBillboard && minDistance < 30) { // Only zoom if within 30 units
+        showZoom(nearestBillboard.userData.billboardText);
+    }
+}
+
+function showZoom(text) {
+    isZoomed = true;
+    const zoomModal = document.getElementById('zoomModal');
+    const zoomText = document.getElementById('zoomText');
+
+    zoomText.innerHTML = text.split('\n').map(line => {
+        // Make the first line (title) bold
+        if (text.indexOf(line) === 0) {
+            return `<strong>${line}</strong>`;
+        }
+        return line;
+    }).join('<br>');
+
+    zoomModal.classList.add('active');
+}
+
+function closeZoom() {
+    isZoomed = false;
+    const zoomModal = document.getElementById('zoomModal');
+    zoomModal.classList.remove('active');
 }
 
 function toggleTheme() {
