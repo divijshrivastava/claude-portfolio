@@ -38,6 +38,9 @@ let isZoomed = false;
 let nearestBillboard = null;
 let nearestDistance = Infinity;
 
+// NPCs
+let npcs = [];
+
 // Audio context and sounds
 let audioContext;
 let engineSound, accelerateSound, collisionSound, objectHitSound;
@@ -67,32 +70,28 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Lights - GTA style with warmer tones
+    const ambientLight = new THREE.AmbientLight(0xfff4e6, 0.5); // Warmer ambient
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(20, 40, 20);
+    const directionalLight = new THREE.DirectionalLight(0xfff8dc, 1.0); // Warmer sun
+    directionalLight.position.set(30, 50, 20);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.left = -50;
-    directionalLight.shadow.camera.right = 50;
-    directionalLight.shadow.camera.top = 50;
-    directionalLight.shadow.camera.bottom = -50;
+    directionalLight.shadow.mapSize.width = 4096; // Better shadows
+    directionalLight.shadow.mapSize.height = 4096;
+    directionalLight.shadow.camera.left = -100;
+    directionalLight.shadow.camera.right = 100;
+    directionalLight.shadow.camera.top = 100;
+    directionalLight.shadow.camera.bottom = -100;
     scene.add(directionalLight);
 
-    // Ground - grass-like
-    const groundGeometry = new THREE.PlaneGeometry(200, 200);
-    const groundMaterial = new THREE.MeshStandardMaterial({
-        color: isDark ? 0x1a2a1a : 0x7cb87c,
-        roughness: 0.9,
-        metalness: 0.1
-    });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    scene.add(ground);
+    // Add secondary light for depth
+    const fillLight = new THREE.DirectionalLight(0x87ceeb, 0.3);
+    fillLight.position.set(-20, 30, -20);
+    scene.add(fillLight);
+
+    // Create urban ground with roads
+    createUrbanGround(isDark);
 
     // Initialize audio
     initAudio();
@@ -107,6 +106,9 @@ function init() {
 
     // Create environmental objects (trees, obstacles)
     createEnvironment();
+
+    // Create NPCs
+    createNPCs();
 
     // Create car
     createCar();
@@ -400,6 +402,246 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
     }
 
     return board;
+}
+
+function createUrbanGround(isDark) {
+    // Main ground - asphalt/concrete mix
+    const groundGeometry = new THREE.PlaneGeometry(200, 200, 20, 20);
+    const groundMaterial = new THREE.MeshStandardMaterial({
+        color: isDark ? 0x2a2a2a : 0x505050,
+        roughness: 0.95,
+        metalness: 0.05
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Add road markings
+    createRoadMarkings();
+
+    // Add sidewalks
+    createSidewalks(isDark);
+
+    // Add city buildings in background
+    createCityBuildings(isDark);
+}
+
+function createRoadMarkings() {
+    // Main road down the center
+    const roadGeometry = new THREE.PlaneGeometry(12, 180);
+    const roadMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1a1a1a,
+        roughness: 0.9
+    });
+    const road = new THREE.Mesh(roadGeometry, roadMaterial);
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(0, 0.01, -10);
+    road.receiveShadow = true;
+    scene.add(road);
+
+    // Road lane markings
+    for (let z = 20; z > -80; z -= 8) {
+        const lineGeometry = new THREE.PlaneGeometry(0.5, 3);
+        const lineMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffff00,
+            emissive: 0xffff00,
+            emissiveIntensity: 0.2
+        });
+        const line = new THREE.Mesh(lineGeometry, lineMaterial);
+        line.rotation.x = -Math.PI / 2;
+        line.position.set(0, 0.02, z);
+        scene.add(line);
+    }
+}
+
+function createSidewalks(isDark) {
+    const sidewalkColor = isDark ? 0x3a3a3a : 0x808080;
+
+    // Left sidewalk
+    const leftSidewalk = new THREE.Mesh(
+        new THREE.PlaneGeometry(8, 180),
+        new THREE.MeshStandardMaterial({ color: sidewalkColor, roughness: 0.9 })
+    );
+    leftSidewalk.rotation.x = -Math.PI / 2;
+    leftSidewalk.position.set(-10, 0.02, -10);
+    leftSidewalk.receiveShadow = true;
+    scene.add(leftSidewalk);
+
+    // Right sidewalk
+    const rightSidewalk = new THREE.Mesh(
+        new THREE.PlaneGeometry(8, 180),
+        new THREE.MeshStandardMaterial({ color: sidewalkColor, roughness: 0.9 })
+    );
+    rightSidewalk.rotation.x = -Math.PI / 2;
+    rightSidewalk.position.set(10, 0.02, -10);
+    rightSidewalk.receiveShadow = true;
+    scene.add(rightSidewalk);
+}
+
+function createCityBuildings(isDark) {
+    const buildingColor = isDark ? 0x2d2d3d : 0x6b7280;
+    const windowColor = isDark ? 0xffcc00 : 0x87ceeb;
+
+    const buildingPositions = [
+        { x: -50, z: -20, w: 15, h: 25, d: 20 },
+        { x: -55, z: 10, w: 12, h: 30, d: 15 },
+        { x: -45, z: -50, w: 18, h: 20, d: 18 },
+        { x: 50, z: -20, w: 15, h: 28, d: 20 },
+        { x: 55, z: 10, w: 12, h: 22, d: 15 },
+        { x: 45, z: -50, w: 18, h: 35, d: 18 }
+    ];
+
+    buildingPositions.forEach(building => {
+        // Building body
+        const buildingGeometry = new THREE.BoxGeometry(building.w, building.h, building.d);
+        const buildingMaterial = new THREE.MeshStandardMaterial({
+            color: buildingColor,
+            roughness: 0.7,
+            metalness: 0.3
+        });
+        const buildingMesh = new THREE.Mesh(buildingGeometry, buildingMaterial);
+        buildingMesh.position.set(building.x, building.h / 2, building.z);
+        buildingMesh.castShadow = true;
+        buildingMesh.receiveShadow = true;
+        scene.add(buildingMesh);
+
+        // Add windows
+        const windowRows = Math.floor(building.h / 3);
+        const windowCols = Math.floor(building.w / 2);
+
+        for (let row = 0; row < windowRows; row++) {
+            for (let col = 0; col < windowCols; col++) {
+                const windowGeometry = new THREE.PlaneGeometry(1, 1.5);
+                const windowMaterial = new THREE.MeshStandardMaterial({
+                    color: windowColor,
+                    emissive: windowColor,
+                    emissiveIntensity: 0.3
+                });
+                const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
+                windowMesh.position.set(
+                    building.x - building.w / 2 + col * 2 + 1,
+                    2 + row * 3,
+                    building.z + building.d / 2 + 0.1
+                );
+                scene.add(windowMesh);
+            }
+        }
+    });
+}
+
+function createNPC(x, z, color) {
+    const npc = new THREE.Group();
+
+    // Body
+    const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 8);
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color: color });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 0.6;
+    body.castShadow = true;
+    npc.add(body);
+
+    // Head
+    const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 1.4;
+    head.castShadow = true;
+    npc.add(head);
+
+    // Legs
+    const legGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.8, 6);
+    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+
+    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    leftLeg.position.set(-0.15, 0.4, 0);
+    leftLeg.castShadow = true;
+    npc.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    rightLeg.position.set(0.15, 0.4, 0);
+    rightLeg.castShadow = true;
+    npc.add(rightLeg);
+
+    npc.position.set(x, 0, z);
+
+    // NPC movement data
+    npc.userData = {
+        speed: 0.02 + Math.random() * 0.02,
+        direction: Math.random() * Math.PI * 2,
+        walkTime: 0,
+        pauseTime: 0,
+        isPaused: false
+    };
+
+    scene.add(npc);
+    npcs.push(npc);
+
+    return npc;
+}
+
+function createNPCs() {
+    const npcColors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6, 0x1abc9c];
+
+    // Create NPCs at various locations
+    for (let i = 0; i < 15; i++) {
+        const x = (Math.random() - 0.5) * 60;
+        const z = -60 + Math.random() * 80;
+        const color = npcColors[Math.floor(Math.random() * npcColors.length)];
+        createNPC(x, z, color);
+    }
+}
+
+function updateNPCs() {
+    npcs.forEach(npc => {
+        if (npc.userData.isPaused) {
+            npc.userData.pauseTime++;
+            if (npc.userData.pauseTime > 60) { // Pause for ~1 second
+                npc.userData.isPaused = false;
+                npc.userData.pauseTime = 0;
+                npc.userData.direction += (Math.random() - 0.5) * Math.PI / 2;
+            }
+            return;
+        }
+
+        npc.userData.walkTime += npc.userData.speed;
+
+        // Animate legs
+        const legSwing = Math.sin(npc.userData.walkTime * 10) * 0.3;
+        if (npc.children[2]) npc.children[2].rotation.x = legSwing;
+        if (npc.children[3]) npc.children[3].rotation.x = -legSwing;
+
+        // Move NPC
+        npc.position.x += Math.sin(npc.userData.direction) * npc.userData.speed;
+        npc.position.z += Math.cos(npc.userData.direction) * npc.userData.speed;
+        npc.rotation.y = npc.userData.direction;
+
+        // Keep within bounds
+        const bounds = 40;
+        if (Math.abs(npc.position.x) > bounds || Math.abs(npc.position.z) > bounds) {
+            npc.userData.direction += Math.PI;
+        }
+
+        // Randomly pause sometimes
+        if (Math.random() < 0.01) {
+            npc.userData.isPaused = true;
+        }
+
+        // Avoid car
+        const distToCar = Math.sqrt(
+            Math.pow(npc.position.x - car.position.x, 2) +
+            Math.pow(npc.position.z - car.position.z, 2)
+        );
+
+        if (distToCar < 5) {
+            // Turn away from car
+            const angleToCar = Math.atan2(
+                npc.position.x - car.position.x,
+                npc.position.z - car.position.z
+            );
+            npc.userData.direction = angleToCar;
+        }
+    });
 }
 
 function createSkillBuckets() {
@@ -1412,6 +1654,9 @@ function animate() {
     requestAnimationFrame(animate);
 
     updateCar();
+
+    // Update NPCs
+    updateNPCs();
 
     // Rotate car body slightly based on turning
     if (carBody) {
