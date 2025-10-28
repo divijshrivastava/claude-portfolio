@@ -494,7 +494,7 @@ function createCareerSteppingStones() {
     post.castShadow = true;
     scene.add(post);
 
-    // Job milestones as large stepping stones across the stream
+    // Job milestones as rideable mountains/hills
     const jobs = [
         { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', z: -5 },
         { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', z: -15 },
@@ -504,27 +504,55 @@ function createCareerSteppingStones() {
     jobs.forEach((job, index) => {
         const xOffset = (index % 2 === 0) ? -28 : -22;
 
-        // Large stepping stone
-        const stoneGeometry = new THREE.CylinderGeometry(3, 3.2, 0.8, 8);
-        const stoneMaterial = new THREE.MeshStandardMaterial({
+        // Create mountain/hill shape using multiple geometries
+        const mountainGroup = new THREE.Group();
+
+        // Base - wide and flat for driving up
+        const baseGeometry = new THREE.CylinderGeometry(5, 6, 1, 16);
+        const mountainMaterial = new THREE.MeshStandardMaterial({
             color: 0x8b7355,
             roughness: 0.9,
             metalness: 0.1
         });
-        const stone = new THREE.Mesh(stoneGeometry, stoneMaterial);
-        stone.position.set(xOffset, 0.4, job.z);
-        stone.castShadow = true;
-        stone.receiveShadow = true;
-        stone.userData = { type: 'static' };
-        scene.add(stone);
-        staticObjects.push(stone);
+        const base = new THREE.Mesh(baseGeometry, mountainMaterial);
+        base.position.y = 0.5;
+        mountainGroup.add(base);
 
-        // Info carved into stone (board on top)
-        const infoBoard = createTextBoard(`${job.company}\n${job.role}\n${job.years}`, 5, 3, '#d4c4b0', '#2d2d2d');
-        infoBoard.rotation.x = -Math.PI / 2;
-        infoBoard.rotation.z = (Math.random() - 0.5) * 0.2;
-        infoBoard.position.set(xOffset, 0.81, job.z);
+        // Mid section - sloping upward
+        const midGeometry = new THREE.CylinderGeometry(3.5, 5, 1.5, 16);
+        const mid = new THREE.Mesh(midGeometry, mountainMaterial);
+        mid.position.y = 1.75;
+        mountainGroup.add(mid);
+
+        // Top section - peak
+        const topGeometry = new THREE.CylinderGeometry(2, 3.5, 1.2, 16);
+        const top = new THREE.Mesh(topGeometry, mountainMaterial);
+        top.position.y = 3.1;
+        mountainGroup.add(top);
+
+        // Add rocky texture with small bumps
+        [base, mid, top].forEach(mesh => {
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+        });
+
+        mountainGroup.position.set(xOffset, 0, job.z);
+        mountainGroup.userData = { type: 'rideable_mountain' };
+        scene.add(mountainGroup);
+
+        // Info sign at the base of the mountain
+        const infoBoard = createTextBoard(`${job.company}\n${job.role}\n${job.years}`, 6, 3.5, '#d4c4b0', '#2d2d2d', true);
+        infoBoard.position.set(xOffset + 7, 2, job.z);
+        infoBoard.rotation.y = -Math.PI / 4;
         scene.add(infoBoard);
+
+        // Support post for sign
+        const signPostGeometry = new THREE.CylinderGeometry(0.15, 0.15, 2, 8);
+        const signPostMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
+        const signPost = new THREE.Mesh(signPostGeometry, signPostMaterial);
+        signPost.position.set(xOffset + 7, 1, job.z);
+        signPost.castShadow = true;
+        scene.add(signPost);
     });
 }
 
@@ -970,11 +998,6 @@ function createEnvironment() {
 }
 
 function addEventListeners() {
-    // Start button
-    document.getElementById('startButton').addEventListener('click', () => {
-        document.getElementById('welcomeOverlay').classList.add('hidden');
-    });
-
     // Keyboard controls
     document.addEventListener('keydown', (e) => {
         keysPressed[e.code] = true;
@@ -1017,7 +1040,10 @@ function addEventListeners() {
 }
 
 function zoomToNearestBillboard() {
-    if (billboards.length === 0) return;
+    if (billboards.length === 0) {
+        console.log('No billboards available');
+        return;
+    }
 
     // Find nearest billboard
     let nearestBillboard = null;
@@ -1031,9 +1057,26 @@ function zoomToNearestBillboard() {
         }
     });
 
-    if (nearestBillboard && minDistance < 30) { // Only zoom if within 30 units
+    console.log(`Nearest billboard distance: ${minDistance.toFixed(2)}`);
+
+    if (nearestBillboard && minDistance < 50) { // Increased range to 50 units
         showZoom(nearestBillboard.userData.billboardText);
+    } else {
+        // Show temporary message
+        showTemporaryMessage(`Move closer to a billboard (${minDistance.toFixed(1)} units away)`);
     }
+}
+
+function showTemporaryMessage(message) {
+    const instructions = document.querySelector('.instructions p');
+    const originalText = instructions.textContent;
+    instructions.textContent = message;
+    instructions.style.color = 'var(--primary-color)';
+
+    setTimeout(() => {
+        instructions.textContent = originalText;
+        instructions.style.color = '';
+    }, 2000);
 }
 
 function showZoom(text) {
@@ -1223,6 +1266,28 @@ function updateCar() {
     }
 
     car.rotation.y = carRotation;
+
+    // Terrain following for mountains
+    let targetY = 0; // Ground level
+    scene.children.forEach(child => {
+        if (child.userData.type === 'rideable_mountain') {
+            const distX = car.position.x - child.position.x;
+            const distZ = car.position.z - child.position.z;
+            const dist2D = Math.sqrt(distX * distX + distZ * distZ);
+
+            // Check if car is over the mountain (within radius)
+            if (dist2D < 6) { // Base radius of mountain
+                // Calculate height based on distance from center
+                // Mountains are roughly 3.7 units tall at center
+                const heightFactor = Math.max(0, 1 - dist2D / 6);
+                const mountainHeight = 3.7 * heightFactor;
+                targetY = Math.max(targetY, mountainHeight);
+            }
+        }
+    });
+
+    // Smoothly adjust car height
+    car.position.y += (targetY - car.position.y) * 0.1;
 
     // Keep car within bounds
     const maxDist = 90;
