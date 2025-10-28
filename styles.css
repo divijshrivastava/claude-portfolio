@@ -260,6 +260,13 @@ body {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* Top Bar Controls */
+.top-bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* Theme Toggle */
 .theme-toggle {
     background: var(--overlay-bg);
@@ -299,6 +306,51 @@ body {
 
 [data-theme="dark"] .moon-icon {
     display: none;
+}
+
+/* Mute Toggle */
+.mute-toggle {
+    background: var(--overlay-bg);
+    border: none;
+    cursor: pointer;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    border-radius: 0.5rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.mute-toggle:hover {
+    color: var(--primary-color);
+    background: var(--bg-tertiary);
+}
+
+.mute-toggle svg {
+    transition: var(--transition);
+}
+
+.sound-on-icon {
+    display: block;
+}
+
+.sound-off-icon {
+    display: none;
+}
+
+.mute-toggle.muted .sound-on-icon {
+    display: none;
+}
+
+.mute-toggle.muted .sound-off-icon {
+    display: block;
+}
+
+.mute-toggle.muted {
+    color: var(--primary-color);
 }
 
 /* Instructions */

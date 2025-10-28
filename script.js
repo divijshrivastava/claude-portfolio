@@ -135,6 +135,7 @@ let audioContext;
 let engineSound;
 let isEngineRunning = false;
 let collisionSound;
+let isMuted = false;
 
 // Initialize
 function init() {
@@ -271,7 +272,7 @@ function initAudio() {
 }
 
 function playEngineSound() {
-    if (!audioContext || isEngineRunning) return;
+    if (!audioContext || isEngineRunning || isMuted) return;
 
     isEngineRunning = true;
     const oscillator = audioContext.createOscillator();
@@ -307,7 +308,7 @@ function stopEngineSound() {
 }
 
 function playCollisionSound() {
-    if (!audioContext) return;
+    if (!audioContext || isMuted) return;
 
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -985,6 +986,9 @@ function addEventListeners() {
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
+    // Mute toggle
+    document.getElementById('muteToggle').addEventListener('click', toggleMute);
+
     // Window resize
     window.addEventListener('resize', onWindowResize);
 }
@@ -1037,6 +1041,24 @@ function toggleTheme() {
             child.material.color.setHex(isDark ? 0x6d6d6d : 0xffffff);
         }
     });
+}
+
+function toggleMute() {
+    isMuted = !isMuted;
+    const muteButton = document.getElementById('muteToggle');
+
+    if (isMuted) {
+        muteButton.classList.add('muted');
+        // Stop engine sound if running
+        if (isEngineRunning) {
+            stopEngineSound();
+        }
+    } else {
+        muteButton.classList.remove('muted');
+    }
+
+    // Save mute preference
+    localStorage.setItem('soundMuted', isMuted);
 }
 
 function showModal(dataKey) {
@@ -1228,6 +1250,13 @@ window.addEventListener('DOMContentLoaded', () => {
     // Check theme
     const currentTheme = localStorage.getItem('theme') || 'light';
     document.documentElement.setAttribute('data-theme', currentTheme);
+
+    // Check mute state
+    const savedMuteState = localStorage.getItem('soundMuted');
+    if (savedMuteState === 'true') {
+        isMuted = true;
+        document.getElementById('muteToggle').classList.add('muted');
+    }
 
     // Simulate loading
     const loadingProgress = document.getElementById('loadingProgress');
