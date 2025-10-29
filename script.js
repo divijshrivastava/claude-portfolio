@@ -878,8 +878,10 @@ function createTrafficVehicle(x, z, lane) {
         angularSpeed: (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1), // Clockwise or counter-clockwise
         lane: lane
     };
-    // Face tangent to circle: inner lane (counter-clockwise) = angle + π/2, outer lane (clockwise) = angle - π/2
-    vehicle.rotation.y = angle + (lane === -1 ? Math.PI / 2 : -Math.PI / 2);
+    // Face tangent to circle - rotation depends on movement direction
+    // Counter-clockwise (lane -1): rotation = -angle
+    // Clockwise (lane 1): rotation = -angle + π (opposite direction)
+    vehicle.rotation.y = lane === -1 ? -angle : (-angle + Math.PI);
 
     scene.add(vehicle);
     trafficVehicles.push(vehicle);
@@ -919,16 +921,80 @@ function updateTrafficVehicles() {
         const vehicleRadius = 2;
         let canMove = true;
 
-        // Check collision with NPCs
-        for (const npc of npcs) {
-            const npcRadius = 0.5;
-            if (checkCollision({ x: nextX, z: nextZ }, vehicleRadius, npc.position, npcRadius)) {
+        // Check collision with static objects (trees, rocks, etc.)
+        for (const obj of staticObjects) {
+            const objRadius = obj.userData.radius || 2;
+            if (checkCollision({ x: nextX, z: nextZ }, vehicleRadius, obj.position, objRadius)) {
                 canMove = false;
-                // Show NPC reaction
-                showNPCReaction(npc);
-                // Slow down significantly
-                vehicle.userData.angularSpeed *= 0.5;
+                // Bounce back by reversing angular speed temporarily
+                vehicle.userData.angularSpeed *= -0.3;
                 break;
+            }
+        }
+
+        // Check collision with movable objects (barrels, cones, etc.) and push them
+        if (canMove) {
+            for (const obj of movableObjects) {
+                const objRadius = 1;
+                if (checkCollision({ x: nextX, z: nextZ }, vehicleRadius, obj.position, objRadius)) {
+                    // Calculate push direction
+                    const pushDir = {
+                        x: obj.position.x - nextX,
+                        z: obj.position.z - nextZ
+                    };
+                    const pushDist = Math.sqrt(pushDir.x * pushDir.x + pushDir.z * pushDir.z);
+                    if (pushDist > 0) {
+                        pushDir.x /= pushDist;
+                        pushDir.z /= pushDist;
+
+                        // Push the object based on vehicle speed and object mass
+                        const pushForce = Math.abs(vehicle.userData.angularSpeed * vehicle.userData.radius) * 3 / (obj.userData.mass || 1);
+                        obj.position.x += pushDir.x * pushForce;
+                        obj.position.z += pushDir.z * pushForce;
+
+                        // Add slight rotation for realism
+                        obj.rotation.y += pushForce * 0.5;
+
+                        // Add bounce effect
+                        if (!obj.userData.bouncing) {
+                            obj.userData.bouncing = true;
+                            obj.userData.originalY = obj.position.y;
+                            obj.userData.bounceTime = 0;
+                        }
+                    }
+                    // Slow down vehicle after pushing object
+                    vehicle.userData.angularSpeed *= 0.7;
+                }
+            }
+        }
+
+        // Check collision with NPCs
+        if (canMove) {
+            for (const npc of npcs) {
+                const npcRadius = 0.5;
+                if (checkCollision({ x: nextX, z: nextZ }, vehicleRadius, npc.position, npcRadius)) {
+                    canMove = false;
+                    // Show NPC reaction
+                    showNPCReaction(npc);
+                    // Slow down significantly
+                    vehicle.userData.angularSpeed *= 0.5;
+                    break;
+                }
+            }
+        }
+
+        // Check collision with other traffic vehicles
+        if (canMove) {
+            for (const otherVehicle of trafficVehicles) {
+                if (vehicle !== otherVehicle) {
+                    const otherVehicleRadius = 2;
+                    if (checkCollision({ x: nextX, z: nextZ }, vehicleRadius, otherVehicle.position, otherVehicleRadius)) {
+                        canMove = false;
+                        // Bounce back slightly
+                        vehicle.userData.angularSpeed *= 0.4;
+                        break;
+                    }
+                }
             }
         }
 
@@ -946,9 +1012,9 @@ function updateTrafficVehicles() {
             vehicle.position.x = nextX;
             vehicle.position.z = nextZ;
             // Update rotation to face tangent direction
-            // Inner lane (lane -1): counter-clockwise, tangent is angle + π/2
-            // Outer lane (lane 1): clockwise, tangent is angle - π/2
-            vehicle.rotation.y = vehicle.userData.angle + (vehicle.userData.lane === -1 ? Math.PI / 2 : -Math.PI / 2);
+            // Counter-clockwise (lane -1): rotation = -angle
+            // Clockwise (lane 1): rotation = -angle + π
+            vehicle.rotation.y = vehicle.userData.lane === -1 ? -vehicle.userData.angle : (-vehicle.userData.angle + Math.PI);
         }
 
         // Simple collision avoidance with other traffic
@@ -1390,7 +1456,7 @@ function createCareerSteppingStones() {
     ];
 
     jobs.forEach((job, index) => {
-        const xOffset = (index % 2 === 0) ? -112 : -88;
+        const xOffset = (index % 2 === 0) ? -140 : -140; // Moved further out to avoid circular road
 
         // Create mountain/hill shape using multiple geometries (4x scale)
         const mountainGroup = new THREE.Group();
