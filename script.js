@@ -3125,24 +3125,46 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Simulate loading
+    // Quick loading simulation (1 second max)
     const loadingProgress = document.getElementById('loadingProgress');
     let progress = 0;
     const loadingInterval = setInterval(() => {
-        progress += Math.random() * 15;
+        progress += 33; // Much faster: 33% every 100ms = ~300ms total
         if (progress >= 100) {
             progress = 100;
+            loadingProgress.style.width = '100%';
             clearInterval(loadingInterval);
+
+            // Hide loading screen immediately after init
             setTimeout(() => {
+                init();
+                setupMobileControls();
+
+                // Aggressively hide loading screen
                 const loadingScreen = document.getElementById('loadingScreen');
                 if (loadingScreen) {
                     loadingScreen.classList.add('hidden');
-                    loadingScreen.style.display = 'none'; // Extra safety
+                    loadingScreen.style.display = 'none';
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.style.visibility = 'hidden';
+                    loadingScreen.style.pointerEvents = 'none';
                 }
-                init();
-                setupMobileControls();
-            }, 500);
+            }, 200); // Reduced from 500ms
+        } else {
+            loadingProgress.style.width = progress + '%';
         }
-        loadingProgress.style.width = progress + '%';
-    }, 200);
+    }, 100); // Faster interval: 200ms -> 100ms
+
+    // Failsafe: Force hide loading screen after 2 seconds no matter what
+    setTimeout(() => {
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+            console.warn('Failsafe: Force hiding loading screen');
+            loadingScreen.classList.add('hidden');
+            loadingScreen.style.display = 'none';
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.visibility = 'hidden';
+            loadingScreen.style.pointerEvents = 'none';
+        }
+    }, 2000);
 });
