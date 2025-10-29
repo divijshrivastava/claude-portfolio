@@ -580,19 +580,83 @@ function createRoadMarkings() {
         scene.add(line);
     }
 
-    // Create zebra crossings at cardinal directions on the circular road
+    // Create zebra crossings at cardinal directions on the circular road with traffic lights
     const crossingAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5]; // North, East, South, West
     zebraCrossings = []; // Reset array
-    crossingAngles.forEach(angle => {
+    crossingAngles.forEach((angle, index) => {
         createCircularZebraCrossing(angle, roadRadius, roadWidth, isDark);
+
+        // Create traffic light objects
+        const lightX = Math.cos(angle) * (roadRadius - roadWidth / 2 - 10);
+        const lightZ = Math.sin(angle) * (roadRadius - roadWidth / 2 - 10);
+        const trafficLight = createTrafficLight(lightX, lightZ, angle, isDark);
+
         zebraCrossings.push({
             angle: angle,
             radius: roadRadius,
             x: Math.cos(angle) * roadRadius,
             z: Math.sin(angle) * roadRadius,
-            roadWidth: roadWidth
+            roadWidth: roadWidth,
+            lightState: index % 2 === 0 ? 'green' : 'red', // Alternate starting states
+            lightTimer: Math.random() * 300, // Random starting offset
+            lightObject: trafficLight
         });
     });
+}
+
+function createTrafficLight(x, z, angle, isDark) {
+    const lightGroup = new THREE.Group();
+
+    // Traffic light pole
+    const poleGeometry = new THREE.CylinderGeometry(0.5, 0.5, 8, 8);
+    const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+    pole.position.y = 4;
+    pole.castShadow = true;
+    lightGroup.add(pole);
+
+    // Light box
+    const boxGeometry = new THREE.BoxGeometry(2, 4, 1);
+    const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const box = new THREE.Mesh(boxGeometry, boxMaterial);
+    box.position.y = 10;
+    box.castShadow = true;
+    lightGroup.add(box);
+
+    // Red light (top)
+    const redLightGeometry = new THREE.CircleGeometry(0.6, 16);
+    const redLightMaterial = new THREE.MeshStandardMaterial({
+        color: 0x440000,
+        emissive: 0xff0000,
+        emissiveIntensity: 0
+    });
+    const redLight = new THREE.Mesh(redLightGeometry, redLightMaterial);
+    redLight.position.set(0, 11, 0.51);
+    lightGroup.add(redLight);
+
+    // Green light (bottom)
+    const greenLightGeometry = new THREE.CircleGeometry(0.6, 16);
+    const greenLightMaterial = new THREE.MeshStandardMaterial({
+        color: 0x004400,
+        emissive: 0x00ff00,
+        emissiveIntensity: 0
+    });
+    const greenLight = new THREE.Mesh(greenLightGeometry, greenLightMaterial);
+    greenLight.position.set(0, 9, 0.51);
+    lightGroup.add(greenLight);
+
+    // Store light meshes for updates
+    lightGroup.userData = {
+        redLight: redLight,
+        greenLight: greenLight
+    };
+
+    // Position and rotate traffic light
+    lightGroup.position.set(x, 0, z);
+    lightGroup.rotation.y = -angle;
+    scene.add(lightGroup);
+
+    return lightGroup;
 }
 
 function createCircularZebraCrossing(angle, roadRadius, roadWidth, isDark) {
@@ -879,10 +943,12 @@ function createTrafficVehicle(x, z, lane) {
     vehicle.position.set(x, 0, z);
     // For circular road: angle represents position on circle, speed is angular velocity
     const angle = Math.atan2(z, x);
+    const targetSpeed = (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1);
     vehicle.userData = {
         angle: angle, // Current angle on circular road
         radius: Math.sqrt(x * x + z * z), // Distance from center
-        angularSpeed: (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1), // Clockwise or counter-clockwise
+        angularSpeed: targetSpeed, // Current speed
+        targetAngularSpeed: targetSpeed, // Target speed for recovery
         lane: lane
     };
     // Face tangent to circle - rotation depends on movement direction
@@ -914,6 +980,35 @@ function createTrafficVehicles() {
 
         createTrafficVehicle(x, z, lane);
     }
+}
+
+function updateTrafficLights() {
+    // Cycle traffic lights: green for 300 frames (~5 seconds), red for 300 frames
+    zebraCrossings.forEach(crossing => {
+        crossing.lightTimer++;
+
+        if (crossing.lightTimer > 300) {
+            // Switch light state
+            crossing.lightState = crossing.lightState === 'green' ? 'red' : 'green';
+            crossing.lightTimer = 0;
+
+            // Update visual appearance
+            if (crossing.lightObject && crossing.lightObject.userData) {
+                const redLight = crossing.lightObject.userData.redLight;
+                const greenLight = crossing.lightObject.userData.greenLight;
+
+                if (crossing.lightState === 'red') {
+                    // Red ON, Green OFF
+                    redLight.material.emissiveIntensity = 1.0;
+                    greenLight.material.emissiveIntensity = 0;
+                } else {
+                    // Red OFF, Green ON
+                    redLight.material.emissiveIntensity = 0;
+                    greenLight.material.emissiveIntensity = 1.0;
+                }
+            }
+        }
+    });
 }
 
 function updateTrafficVehicles() {
@@ -1060,16 +1155,48 @@ function updateTrafficVehicles() {
             vehicle.userData.angularSpeed *= 0.9;
         }
 
-        // Slow down near zebra crossings
+        // Traffic light coordination at zebra crossings
+        let shouldStopForLight = false;
         for (const crossing of zebraCrossings) {
             // Calculate angular distance to crossing
             let angleDiff = Math.abs(vehicle.userData.angle - crossing.angle);
             if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
 
             if (angleDiff < 0.3) { // Within ~17 degrees of crossing
-                // Gradual slowdown approaching crossing
-                vehicle.userData.angularSpeed *= 0.95;
+                // Check traffic light state
+                if (crossing.lightState === 'red') {
+                    // STOP at red light
+                    if (angleDiff < 0.15) { // Very close to crossing
+                        vehicle.userData.angularSpeed *= 0.3; // Almost stop
+                        shouldStopForLight = true;
+                    } else {
+                        vehicle.userData.angularSpeed *= 0.8; // Slow approach
+                    }
+                } else {
+                    // Green light - gradual slowdown for safety
+                    vehicle.userData.angularSpeed *= 0.95;
+                }
                 break;
+            }
+        }
+
+        // Speed recovery when path is clear (no obstacles, not at red light)
+        if (!shouldStopForLight && canMove) {
+            const speedDiff = Math.abs(vehicle.userData.targetAngularSpeed) - Math.abs(vehicle.userData.angularSpeed);
+            if (speedDiff > 0.0001) {
+                // Gradually accelerate back to target speed
+                const acceleration = vehicle.userData.targetAngularSpeed * 0.02;
+                if (vehicle.userData.lane === -1) {
+                    vehicle.userData.angularSpeed = Math.min(
+                        vehicle.userData.targetAngularSpeed,
+                        vehicle.userData.angularSpeed + Math.abs(acceleration)
+                    );
+                } else {
+                    vehicle.userData.angularSpeed = Math.max(
+                        vehicle.userData.targetAngularSpeed,
+                        vehicle.userData.angularSpeed - Math.abs(acceleration)
+                    );
+                }
             }
         }
     });
@@ -1132,12 +1259,26 @@ function updateNPCs() {
                 const angleToXing = Math.atan2(crossing.x - npc.position.x, crossing.z - npc.position.z);
                 npc.userData.direction = angleToXing;
             } else {
-                // At crossing, cross radially (either inward or outward)
-                const crossInward = distFromCenter > roadRadius;
-                const targetRadius = crossInward ? roadRadius - roadWidth : roadRadius + roadWidth;
-                const angleToCenter = Math.atan2(-npc.position.x, -npc.position.z);
-                npc.userData.direction = crossInward ? angleToCenter : angleToCenter + Math.PI;
+                // At crossing - check traffic light before crossing
+                if (crossing.lightState === 'green') {
+                    // Green light - safe to cross
+                    const crossInward = distFromCenter > roadRadius;
+                    const targetRadius = crossInward ? roadRadius - roadWidth : roadRadius + roadWidth;
+                    const angleToCenter = Math.atan2(-npc.position.x, -npc.position.z);
+                    npc.userData.direction = crossInward ? angleToCenter : angleToCenter + Math.PI;
+                } else {
+                    // Red light - WAIT at crossing
+                    // Stand still by pausing briefly
+                    if (!npc.userData.waitingAtLight) {
+                        npc.userData.waitingAtLight = true;
+                    }
+                    // Stay in place (don't update direction)
+                    return;
+                }
             }
+        } else if (npc.userData.waitingAtLight) {
+            // Was waiting at light, now can move again
+            npc.userData.waitingAtLight = false;
         }
 
         // Check if finished crossing
@@ -2447,6 +2588,9 @@ function animate() {
     requestAnimationFrame(animate);
 
     updateCar();
+
+    // Update traffic lights
+    updateTrafficLights();
 
     // Update NPCs
     updateNPCs();
