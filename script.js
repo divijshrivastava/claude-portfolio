@@ -79,13 +79,17 @@ function init() {
     camera.position.set(0, 24, 24);
     camera.lookAt(0, 0, 0);
 
-    // Renderer
+    // Renderer - Optimized for performance
     const canvas = document.getElementById('webglCanvas');
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: false, // Disabled for better performance
+        powerPreference: "high-performance"
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Reduced from 2
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.BasicShadowMap; // Faster than PCFSoftShadowMap
 
     // Lights - Cyberpunk neon style
     const ambientLight = new THREE.AmbientLight(isDark ? 0x4a5a8a : 0xd1dfff, isDark ? 0.4 : 0.6);
@@ -94,12 +98,14 @@ function init() {
     const directionalLight = new THREE.DirectionalLight(isDark ? 0x00d4ff : 0xffffff, isDark ? 0.8 : 1.0); // Cyan/white main light
     directionalLight.position.set(30, 50, 20);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 4096;
-    directionalLight.shadow.mapSize.height = 4096;
+    directionalLight.shadow.mapSize.width = 2048; // Reduced from 4096 for better performance
+    directionalLight.shadow.mapSize.height = 2048; // Reduced from 4096 for better performance
     directionalLight.shadow.camera.left = -100;
     directionalLight.shadow.camera.right = 100;
     directionalLight.shadow.camera.top = 100;
     directionalLight.shadow.camera.bottom = -100;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 200;
     scene.add(directionalLight);
 
     // Add secondary neon light for depth
@@ -450,7 +456,7 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
 
 function createUrbanGround(isDark) {
     // Main ground - cyberpunk neon grid style (4x larger)
-    const groundGeometry = new THREE.PlaneGeometry(800, 800, 20, 20);
+    const groundGeometry = new THREE.PlaneGeometry(800, 800, 10, 10); // Reduced segments from 20x20 to 10x10
     const groundMaterial = new THREE.MeshStandardMaterial({
         color: isDark ? 0x0f1933 : 0xc5d5ff, // Deep navy / light blue
         roughness: isDark ? 0.8 : 0.9,
@@ -594,37 +600,42 @@ function createCityBuildings(isDark) {
     });
 }
 
+// Shared geometries and materials for NPCs (performance optimization)
+const npcSharedGeometry = {
+    body: new THREE.CylinderGeometry(0.3, 0.3, 1.2, 6),
+    head: new THREE.SphereGeometry(0.25, 6, 6),
+    leg: new THREE.CylinderGeometry(0.12, 0.12, 0.8, 4)
+};
+const npcSharedMaterials = {
+    head: new THREE.MeshStandardMaterial({ color: 0xffdbac }),
+    leg: new THREE.MeshStandardMaterial({ color: 0x2c3e50 })
+};
+
 function createNPC(x, z, color) {
     const npc = new THREE.Group();
 
-    // Body
-    const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1.2, 8);
+    // Body (unique material for color)
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: color });
-    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    const body = new THREE.Mesh(npcSharedGeometry.body, bodyMaterial);
     body.position.y = 0.6;
-    body.castShadow = true;
+    body.castShadow = false;
     npc.add(body);
 
-    // Head
-    const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
-    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffdbac });
-    const head = new THREE.Mesh(headGeometry, headMaterial);
+    // Head (shared material)
+    const head = new THREE.Mesh(npcSharedGeometry.head, npcSharedMaterials.head);
     head.position.y = 1.4;
-    head.castShadow = true;
+    head.castShadow = false;
     npc.add(head);
 
-    // Legs
-    const legGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.8, 6);
-    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
-
-    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    // Legs (shared geometry and material)
+    const leftLeg = new THREE.Mesh(npcSharedGeometry.leg, npcSharedMaterials.leg);
     leftLeg.position.set(-0.15, 0.4, 0);
-    leftLeg.castShadow = true;
+    leftLeg.castShadow = false;
     npc.add(leftLeg);
 
-    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    const rightLeg = new THREE.Mesh(npcSharedGeometry.leg, npcSharedMaterials.leg);
     rightLeg.position.set(0.15, 0.4, 0);
-    rightLeg.castShadow = true;
+    rightLeg.castShadow = false;
     npc.add(rightLeg);
 
     npc.position.set(x, 0, z);
@@ -656,8 +667,8 @@ function createNPCs() {
         0xe91e63, 0x9c27b0, 0x673ab7, 0x3f51b5, 0x2196f3, 0x00bcd4
     ];
 
-    // Create many more NPCs for busy NYC streets (50 NPCs)
-    for (let i = 0; i < 50; i++) {
+    // Create NPCs for busy streets (30 NPCs - optimized for performance)
+    for (let i = 0; i < 30; i++) {
         const x = (Math.random() - 0.5) * 240;
         const z = -240 + Math.random() * 320;
         const color = npcColors[Math.floor(Math.random() * npcColors.length)];
@@ -693,7 +704,7 @@ function createTrafficVehicle(x, z, lane) {
     });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.position.y = 0.7;
-    body.castShadow = true;
+    body.castShadow = true; // Keep shadow for main body only
     vehicle.add(body);
 
     // Vehicle cabin
@@ -705,11 +716,11 @@ function createTrafficVehicle(x, z, lane) {
     });
     const cabin = new THREE.Mesh(cabinGeometry, cabinMaterial);
     cabin.position.set(0, 1.2, -0.3);
-    cabin.castShadow = true;
+    cabin.castShadow = false; // Disabled for performance
     vehicle.add(cabin);
 
     // Wheels
-    const wheelGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12);
+    const wheelGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 8); // Reduced segments from 12 to 8
     const wheelMaterial = new THREE.MeshStandardMaterial({
         color: 0x1a1a1a,
         roughness: 0.8
@@ -726,7 +737,7 @@ function createTrafficVehicle(x, z, lane) {
         const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
         wheel.rotation.z = Math.PI / 2;
         wheel.position.set(pos.x, 0.35, pos.z);
-        wheel.castShadow = true;
+        wheel.castShadow = false; // Disabled for performance
         vehicle.add(wheel);
     });
 
@@ -745,8 +756,8 @@ function createTrafficVehicle(x, z, lane) {
 }
 
 function createTrafficVehicles() {
-    // Create traffic on both lanes (left going down, right going up)
-    const numVehicles = 20;
+    // Create traffic on both lanes (reduced for performance)
+    const numVehicles = 12; // Reduced from 20 for better performance
 
     for (let i = 0; i < numVehicles; i++) {
         const lane = Math.random() > 0.5 ? -1 : 1; // Left or right lane
