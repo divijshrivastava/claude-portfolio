@@ -608,42 +608,42 @@ function createRoadMarkings() {
 function createTrafficLight(x, z, angle, isDark, initialState) {
     const lightGroup = new THREE.Group();
 
-    // Traffic light pole - MUCH TALLER AND THICKER for visibility
-    const poleGeometry = new THREE.CylinderGeometry(2, 2, 30, 16);
+    // Traffic light pole - Lower height to fit in camera view
+    const poleGeometry = new THREE.CylinderGeometry(2, 2, 10, 16);
     const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-    pole.position.y = 15;
+    pole.position.y = 5;
     pole.castShadow = true;
     lightGroup.add(pole);
 
-    // Light box - LARGER
-    const boxGeometry = new THREE.BoxGeometry(8, 16, 4);
+    // Light box - Reasonable size
+    const boxGeometry = new THREE.BoxGeometry(6, 10, 3);
     const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
     const box = new THREE.Mesh(boxGeometry, boxMaterial);
-    box.position.y = 38;
+    box.position.y = 13;
     box.castShadow = true;
     lightGroup.add(box);
 
-    // Red light (top) - MUCH LARGER with SphereGeometry for visibility from all angles
-    const redLightGeometry = new THREE.SphereGeometry(3, 16, 16);
+    // Red light (top) - Large spheres for visibility from all angles
+    const redLightGeometry = new THREE.SphereGeometry(2, 16, 16);
     const redLightMaterial = new THREE.MeshStandardMaterial({
         color: 0xff0000,
         emissive: 0xff0000,
         emissiveIntensity: initialState === 'red' ? 2.0 : 0.1
     });
     const redLight = new THREE.Mesh(redLightGeometry, redLightMaterial);
-    redLight.position.set(0, 42, 2.5);
+    redLight.position.set(0, 16, 2);
     lightGroup.add(redLight);
 
-    // Green light (bottom) - MUCH LARGER with SphereGeometry
-    const greenLightGeometry = new THREE.SphereGeometry(3, 16, 16);
+    // Green light (bottom) - Large spheres
+    const greenLightGeometry = new THREE.SphereGeometry(2, 16, 16);
     const greenLightMaterial = new THREE.MeshStandardMaterial({
         color: 0x00ff00,
         emissive: 0x00ff00,
         emissiveIntensity: initialState === 'green' ? 2.0 : 0.1
     });
     const greenLight = new THREE.Mesh(greenLightGeometry, greenLightMaterial);
-    greenLight.position.set(0, 34, 2.5);
+    greenLight.position.set(0, 10, 2);
     lightGroup.add(greenLight);
 
     // Store light meshes for updates
@@ -2255,15 +2255,21 @@ function checkCollision(pos1, radius1, pos2, radius2) {
 }
 
 function updateCar() {
+    // Check for shift boost (2x speed multiplier)
+    const isShiftPressed = keysPressed['ShiftLeft'] || keysPressed['ShiftRight'];
+    const speedMultiplier = isShiftPressed ? 2.0 : 1.0;
+    const effectiveMaxSpeed = maxSpeed * speedMultiplier;
+    const effectiveAcceleration = acceleration * speedMultiplier;
+
     // Forward/Backward
     const isAccelerating = keysPressed['KeyW'] || keysPressed['ArrowUp'];
     const isBraking = keysPressed['KeyS'] || keysPressed['ArrowDown'];
 
     if (isAccelerating) {
-        carSpeed = Math.min(carSpeed + acceleration, maxSpeed);
+        carSpeed = Math.min(carSpeed + effectiveAcceleration, effectiveMaxSpeed);
         if (!isEngineRunning) playEngineSound();
     } else if (isBraking) {
-        carSpeed = Math.max(carSpeed - acceleration, -maxSpeed * 0.5);
+        carSpeed = Math.max(carSpeed - effectiveAcceleration, -effectiveMaxSpeed * 0.5);
         if (!isEngineRunning) playEngineSound();
     } else {
         // Deceleration
@@ -2304,9 +2310,10 @@ function updateCar() {
         }
     }
 
-    // Calculate new position
-    const newX = car.position.x + Math.sin(carRotation) * carSpeed;
-    const newZ = car.position.z + Math.cos(carRotation) * carSpeed;
+    // Calculate new position (apply speed multiplier for actual movement)
+    const effectiveSpeed = carSpeed * speedMultiplier;
+    const newX = car.position.x + Math.sin(carRotation) * effectiveSpeed;
+    const newZ = car.position.z + Math.cos(carRotation) * effectiveSpeed;
     const carRadius = 2;
 
     let canMove = true;
