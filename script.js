@@ -586,10 +586,11 @@ function createRoadMarkings() {
     crossingAngles.forEach((angle, index) => {
         createCircularZebraCrossing(angle, roadRadius, roadWidth, isDark);
 
-        // Create traffic light objects
-        const lightX = Math.cos(angle) * (roadRadius - roadWidth / 2 - 10);
-        const lightZ = Math.sin(angle) * (roadRadius - roadWidth / 2 - 10);
-        const trafficLight = createTrafficLight(lightX, lightZ, angle, isDark);
+        // Create traffic light objects - positioned INSIDE the road edge for better visibility
+        const lightX = Math.cos(angle) * (roadRadius - roadWidth / 2 - 15);
+        const lightZ = Math.sin(angle) * (roadRadius - roadWidth / 2 - 15);
+        const initialState = index % 2 === 0 ? 'green' : 'red';
+        const trafficLight = createTrafficLight(lightX, lightZ, angle, isDark, initialState);
 
         zebraCrossings.push({
             angle: angle,
@@ -597,52 +598,52 @@ function createRoadMarkings() {
             x: Math.cos(angle) * roadRadius,
             z: Math.sin(angle) * roadRadius,
             roadWidth: roadWidth,
-            lightState: index % 2 === 0 ? 'green' : 'red', // Alternate starting states
+            lightState: initialState, // Alternate starting states
             lightTimer: Math.random() * 300, // Random starting offset
             lightObject: trafficLight
         });
     });
 }
 
-function createTrafficLight(x, z, angle, isDark) {
+function createTrafficLight(x, z, angle, isDark, initialState) {
     const lightGroup = new THREE.Group();
 
-    // Traffic light pole
-    const poleGeometry = new THREE.CylinderGeometry(0.5, 0.5, 8, 8);
+    // Traffic light pole - MUCH TALLER AND THICKER for visibility
+    const poleGeometry = new THREE.CylinderGeometry(2, 2, 30, 16);
     const poleMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-    pole.position.y = 4;
+    pole.position.y = 15;
     pole.castShadow = true;
     lightGroup.add(pole);
 
-    // Light box
-    const boxGeometry = new THREE.BoxGeometry(2, 4, 1);
+    // Light box - LARGER
+    const boxGeometry = new THREE.BoxGeometry(8, 16, 4);
     const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
     const box = new THREE.Mesh(boxGeometry, boxMaterial);
-    box.position.y = 10;
+    box.position.y = 38;
     box.castShadow = true;
     lightGroup.add(box);
 
-    // Red light (top)
-    const redLightGeometry = new THREE.CircleGeometry(0.6, 16);
+    // Red light (top) - MUCH LARGER with SphereGeometry for visibility from all angles
+    const redLightGeometry = new THREE.SphereGeometry(3, 16, 16);
     const redLightMaterial = new THREE.MeshStandardMaterial({
-        color: 0x440000,
+        color: 0xff0000,
         emissive: 0xff0000,
-        emissiveIntensity: 0
+        emissiveIntensity: initialState === 'red' ? 2.0 : 0.1
     });
     const redLight = new THREE.Mesh(redLightGeometry, redLightMaterial);
-    redLight.position.set(0, 11, 0.51);
+    redLight.position.set(0, 42, 2.5);
     lightGroup.add(redLight);
 
-    // Green light (bottom)
-    const greenLightGeometry = new THREE.CircleGeometry(0.6, 16);
+    // Green light (bottom) - MUCH LARGER with SphereGeometry
+    const greenLightGeometry = new THREE.SphereGeometry(3, 16, 16);
     const greenLightMaterial = new THREE.MeshStandardMaterial({
-        color: 0x004400,
+        color: 0x00ff00,
         emissive: 0x00ff00,
-        emissiveIntensity: 0
+        emissiveIntensity: initialState === 'green' ? 2.0 : 0.1
     });
     const greenLight = new THREE.Mesh(greenLightGeometry, greenLightMaterial);
-    greenLight.position.set(0, 9, 0.51);
+    greenLight.position.set(0, 34, 2.5);
     lightGroup.add(greenLight);
 
     // Store light meshes for updates
@@ -999,12 +1000,12 @@ function updateTrafficLights() {
 
                 if (crossing.lightState === 'red') {
                     // Red ON, Green OFF
-                    redLight.material.emissiveIntensity = 1.0;
-                    greenLight.material.emissiveIntensity = 0;
+                    redLight.material.emissiveIntensity = 2.0;
+                    greenLight.material.emissiveIntensity = 0.1;
                 } else {
                     // Red OFF, Green ON
-                    redLight.material.emissiveIntensity = 0;
-                    greenLight.material.emissiveIntensity = 1.0;
+                    redLight.material.emissiveIntensity = 0.1;
+                    greenLight.material.emissiveIntensity = 2.0;
                 }
             }
         }
