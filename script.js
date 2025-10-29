@@ -333,6 +333,43 @@ function showConversationBubble(npc, message) {
     return bubble;
 }
 
+function showNPCReaction(npc) {
+    // Don't show reaction if already talking or recently reacted
+    if (npc.userData.isTalking || npc.userData.recentlyHit) return;
+
+    npc.userData.recentlyHit = true;
+
+    // Get screen position of NPC
+    const vector = new THREE.Vector3();
+    npc.getWorldPosition(vector);
+    vector.y += 2.5; // Position above NPC head
+    vector.project(camera);
+
+    const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
+    const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+    // Create bubble element
+    const bubble = document.createElement('div');
+    bubble.className = 'conversation-bubble npc-reaction';
+    bubble.style.left = screenX + 'px';
+    bubble.style.top = screenY + 'px';
+    bubble.textContent = "Hey, watch where you're going!";
+    bubble.setAttribute('data-npc-id', npc.uuid);
+
+    document.body.appendChild(bubble);
+
+    // Remove bubble after 2 seconds
+    setTimeout(() => {
+        bubble.classList.add('fade-out');
+        setTimeout(() => bubble.remove(), 300);
+    }, 2000);
+
+    // Reset reaction cooldown after 5 seconds
+    setTimeout(() => {
+        npc.userData.recentlyHit = false;
+    }, 5000);
+}
+
 function removeConversationBubbles(npcId) {
     const bubbles = document.querySelectorAll(`.conversation-bubble[data-npc-id="${npcId}"]`);
     bubbles.forEach(bubble => {
@@ -787,6 +824,8 @@ function updateTrafficVehicles() {
             const npcRadius = 0.5;
             if (checkCollision({ x: vehicle.position.x, z: nextZ }, vehicleRadius, npc.position, npcRadius)) {
                 canMove = false;
+                // Show NPC reaction
+                showNPCReaction(npc);
                 // Slow down significantly
                 vehicle.userData.speed = Math.max(0.02, vehicle.userData.speed * 0.5);
                 break;
@@ -1896,6 +1935,9 @@ function updateCar() {
             canMove = false;
             collisionIntensity = Math.abs(carSpeed) * 0.5;
             playCollisionSound(collisionIntensity);
+
+            // Show NPC reaction
+            showNPCReaction(npc);
 
             // Push NPC away
             const pushDir = {

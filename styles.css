@@ -1048,6 +1048,23 @@ body {
     box-shadow: 0 8px 24px rgba(0, 212, 255, 0.8), 0 0 50px rgba(107, 43, 255, 0.6);
 }
 
+/* NPC Reaction Bubbles (when hit by cars) */
+.conversation-bubble.npc-reaction {
+    background: linear-gradient(135deg, rgba(255, 77, 77, 0.95), rgba(255, 109, 0, 0.9));
+    box-shadow: 0 8px 24px rgba(255, 77, 77, 0.6), 0 0 40px rgba(255, 109, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    font-weight: 700;
+}
+
+.conversation-bubble.npc-reaction::after {
+    border-top: 10px solid rgba(255, 109, 0, 0.9);
+}
+
+[data-theme="dark"] .conversation-bubble.npc-reaction {
+    background: linear-gradient(135deg, rgba(255, 77, 77, 0.98), rgba(255, 109, 0, 0.95));
+    box-shadow: 0 8px 24px rgba(255, 77, 77, 0.8), 0 0 50px rgba(255, 109, 0, 0.6);
+}
+
 @keyframes conversationPop {
     0% {
         transform: translate(-50%, -100%) scale(0.5);
