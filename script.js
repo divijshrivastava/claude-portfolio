@@ -40,6 +40,11 @@ let npcs = [];
 let trafficVehicles = [];
 let zebraCrossings = []; // Store zebra crossing positions
 let activeBubbles = []; // Track active NPC reaction bubbles for position updates
+let policeVehicles = [];
+let policeStation;
+let policeStationPosition = { x: -300, z: 260 };
+let policeArrestBoard;
+let lastArrestCount = -1;
 
 // NPC Conversations
 const npcConversations = [
@@ -74,7 +79,7 @@ function init() {
     scene = new THREE.Scene();
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     scene.background = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff); // Deep space blue / soft blue white
-    scene.fog = new THREE.Fog(isDark ? 0x0a0e27 : 0xf0f4ff, 200, 600); // 4x fog distance
+    scene.fog = new THREE.Fog(isDark ? 0x0a0e27 : 0xf0f4ff, 400, 1200); // Increased fog distance for larger map
 
     // Camera - More dynamic angle view (Bruno Simon style, adjusted for larger space)
     camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
@@ -514,7 +519,7 @@ function createTextBoard(text, width, height, bgColor = '#ffffff', textColor = '
 
 function createUrbanGround(isDark) {
     // Main ground - cyberpunk neon grid style (4x larger)
-    const groundGeometry = new THREE.PlaneGeometry(800, 800, 10, 10); // Reduced segments from 20x20 to 10x10
+    const groundGeometry = new THREE.PlaneGeometry(1600, 1600, 10, 10); // Reduced segments from 20x20 to 10x10
     const groundMaterial = new THREE.MeshStandardMaterial({
         color: isDark ? 0x0f1933 : 0xc5d5ff, // Deep navy / light blue
         roughness: isDark ? 0.8 : 0.9,
@@ -541,7 +546,7 @@ function createRoadMarkings() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     // Create circular road OUTSIDE the city - encompasses all CV content
-    const roadRadius = 250; // Large radius to surround all resume elements
+    const roadRadius = 350; // Large radius to surround all resume elements
     const roadWidth = 40; // Width of the road
     const segments = 128; // More segments for smoother large circle
 
@@ -592,6 +597,12 @@ function createRoadMarkings() {
         const initialState = index % 2 === 0 ? 'green' : 'red';
         const trafficLight = createTrafficLight(lightX, lightZ, angle, isDark, initialState);
 
+        // Per-light independent timing with randomized durations and phase offset
+        const greenDuration = 240 + Math.floor(Math.random() * 180); // 4-7 seconds
+        const redDuration = 240 + Math.floor(Math.random() * 180);   // 4-7 seconds
+        const currentDuration = initialState === 'green' ? greenDuration : redDuration;
+        const phaseOffset = Math.floor(Math.random() * currentDuration);
+
         zebraCrossings.push({
             angle: angle,
             radius: roadRadius,
@@ -599,8 +610,11 @@ function createRoadMarkings() {
             z: Math.sin(angle) * roadRadius,
             roadWidth: roadWidth,
             lightState: initialState, // Alternate starting states
-            lightTimer: Math.random() * 300, // Random starting offset
-            lightObject: trafficLight
+            lightTimer: phaseOffset,
+            lightObject: trafficLight,
+            greenDuration: greenDuration,
+            redDuration: redDuration,
+            currentDuration: currentDuration
         });
     });
 }
@@ -646,10 +660,23 @@ function createTrafficLight(x, z, angle, isDark, initialState) {
     greenLight.position.set(0, 10, 2);
     lightGroup.add(greenLight);
 
+    // Duplicate lights on the opposite side so both directions can see the signal
+    const backRedLight = new THREE.Mesh(redLightGeometry, redLightMaterial.clone());
+    backRedLight.material.emissiveIntensity = initialState === 'red' ? 2.0 : 0.1;
+    backRedLight.position.set(0, 16, -2);
+    lightGroup.add(backRedLight);
+
+    const backGreenLight = new THREE.Mesh(greenLightGeometry, greenLightMaterial.clone());
+    backGreenLight.material.emissiveIntensity = initialState === 'green' ? 2.0 : 0.1;
+    backGreenLight.position.set(0, 10, -2);
+    lightGroup.add(backGreenLight);
+
     // Store light meshes for updates
     lightGroup.userData = {
-        redLight: redLight,
-        greenLight: greenLight
+        redLight: redLight, // backward compatibility
+        greenLight: greenLight, // backward compatibility
+        redLights: [redLight, backRedLight],
+        greenLights: [greenLight, backGreenLight]
     };
 
     // Position and rotate traffic light
@@ -862,11 +889,18 @@ function createNPCs() {
         { name: 'East Skills', xMin: 130, xMax: 180, zMin: -80, zMax: 80 },         // East skills area
         { name: 'West Career', xMin: -180, xMax: -130, zMin: -80, zMax: 80 },       // West career area
         { name: 'South Contact', xMin: -60, xMax: 60, zMin: -220, zMax: -140 },     // South contact area
-        { name: 'Inner Circle', xMin: -60, xMax: 60, zMin: -60, zMax: 60 }          // Central area
+        { name: 'Inner Circle', xMin: -60, xMax: 60, zMin: -60, zMax: 60 },         // Central area
+        { name: 'Outer Circle', xMin: -220, xMax: 220, zMin: -220, zMax: 220 },       // Outer circle
+        { name: 'Poor Neighborhood', xMin: -320, xMax: 220, zMin: -320, zMax: 220 },       // Poor neighborhood
+        { name: 'Industrial Zone', xMin: -320, xMax: 220, zMin: -320, zMax: 220 },       // Industrial zone
+        { name: 'Commercial Zone', xMin: -320, xMax: 220, zMin: -320, zMax: 220 },      // Commercial zone
+        { name: 'Residential Zone', xMin: -320, xMax: 220, zMin: -320, zMax: 220 },       // Residential zone
+        { name: 'Office Zone', xMin: -320, xMax: 220, zMin: -320, zMax: 220 },       // Office zone
+        { name: 'Government Zone', xMin: -320, xMax: 220, zMin: -320, zMax: 220 }       // Government zone
     ];
 
     // Distribute NPCs across zones (6 per zone)
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 10; i++) {
         const zone = pedestrianZones[i % pedestrianZones.length];
         const x = zone.xMin + Math.random() * (zone.xMax - zone.xMin);
         const z = zone.zMin + Math.random() * (zone.zMax - zone.zMin);
@@ -880,21 +914,35 @@ function createTrafficVehicle(x, z, lane) {
     const vehicle = new THREE.Group();
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Random vehicle colors (NYC taxi yellow, various car colors)
-    const vehicleColors = [
-        0xffd700, // Taxi yellow
-        0xff6d00, // Orange
-        0x00d4ff, // Cyan
-        0xff2e97, // Pink
-        0x2196f3, // Blue
-        0x1a1a1a, // Black
-        0xe0e0e0, // Silver
-        0xff0000  // Red
+    // Real-world inspired vehicle categories
+    const VEHICLE_CATEGORIES = [
+        { name: 'taxi', weight: 0.12, speedFactor: 1.0, size: { x: 1.0, y: 1.0, z: 1.0 }, colors: [0xffd700] },
+        { name: 'economy', weight: 0.22, speedFactor: 0.9, size: { x: 0.95, y: 0.95, z: 0.95 }, colors: [0xe0e0e0, 0x1a1a1a, 0x2196f3] },
+        { name: 'sedan', weight: 0.28, speedFactor: 1.0, size: { x: 1.0, y: 1.0, z: 1.0 }, colors: [0xe0e0e0, 0x1a1a1a, 0x6b2bff, 0x00d4ff] },
+        { name: 'suv', weight: 0.14, speedFactor: 0.95, size: { x: 1.1, y: 1.1, z: 1.1 }, colors: [0x1a1a1a, 0x556b2f, 0x8b8c89] },
+        { name: 'sports', weight: 0.08, speedFactor: 1.4, size: { x: 0.95, y: 0.9, z: 1.1 }, colors: [0xff0000, 0xff6d00, 0x00d4ff] },
+        { name: 'truck', weight: 0.10, speedFactor: 0.7, size: { x: 1.2, y: 1.2, z: 1.4 }, colors: [0x8b4513, 0x708090, 0x1a1a1a] },
+        { name: 'bus', weight: 0.06, speedFactor: 0.6, size: { x: 1.4, y: 1.3, z: 1.8 }, colors: [0xffd700, 0xff6d00] }
     ];
-    const color = vehicleColors[Math.floor(Math.random() * vehicleColors.length)];
+
+    function pickCategory() {
+        const total = VEHICLE_CATEGORIES.reduce((s, c) => s + c.weight, 0);
+        let r = Math.random() * total;
+        for (const c of VEHICLE_CATEGORIES) {
+            if ((r -= c.weight) <= 0) return c;
+        }
+        return VEHICLE_CATEGORIES[0];
+    }
+
+    const category = pickCategory();
+
+    // Random vehicle colors (NYC taxi yellow, various car colors)
+    const palette = category.colors;
+    const color = palette[Math.floor(Math.random() * palette.length)];
 
     // Vehicle body (slightly smaller than player car)
-    const bodyGeometry = new THREE.BoxGeometry(1.8, 0.7, 3.5);
+    const size = category.size;
+    const bodyGeometry = new THREE.BoxGeometry(1.8 * size.x, 0.7 * size.y, 3.5 * size.z);
     const bodyMaterial = new THREE.MeshStandardMaterial({
         color: color,
         roughness: 0.3,
@@ -908,7 +956,7 @@ function createTrafficVehicle(x, z, lane) {
     vehicle.add(body);
 
     // Vehicle cabin
-    const cabinGeometry = new THREE.BoxGeometry(1.5, 0.5, 2);
+    const cabinGeometry = new THREE.BoxGeometry(1.5 * size.x, 0.5 * size.y, 2 * size.z);
     const cabinMaterial = new THREE.MeshStandardMaterial({
         color: isDark ? 0x1a1a1a : 0x333333,
         roughness: 0.2,
@@ -920,7 +968,7 @@ function createTrafficVehicle(x, z, lane) {
     vehicle.add(cabin);
 
     // Wheels
-    const wheelGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 8); // Reduced segments from 12 to 8
+    const wheelGeometry = new THREE.CylinderGeometry(0.35 * size.y, 0.35 * size.y, 0.25 * size.x, 8); // Reduced segments from 12 to 8
     const wheelMaterial = new THREE.MeshStandardMaterial({
         color: 0x1a1a1a,
         roughness: 0.8
@@ -944,13 +992,24 @@ function createTrafficVehicle(x, z, lane) {
     vehicle.position.set(x, 0, z);
     // For circular road: angle represents position on circle, speed is angular velocity
     const angle = Math.atan2(z, x);
-    const targetSpeed = (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1);
+    const baseAngular = 0.0018 + Math.random() * 0.0012; // base angular speed range
+    const targetSpeed = (baseAngular * category.speedFactor) * (lane === -1 ? 1 : -1);
     vehicle.userData = {
         angle: angle, // Current angle on circular road
-        radius: Math.sqrt(x * x + z * z), // Distance from center
+		radius: Math.sqrt(x * x + z * z), // Base distance from center (will add small wobble at runtime)
         angularSpeed: targetSpeed, // Current speed
         targetAngularSpeed: targetSpeed, // Target speed for recovery
-        lane: lane
+        lane: lane,
+		wobblePhase: Math.random() * Math.PI * 2,
+        wobbleAmplitude: 1.5,
+        npcBumpCount: 0,
+        policeDispatched: false,
+        arrested: false,
+        exemptFromPolice: false,
+        category: category.name,
+        stuckTime: 0,
+        laneChangeCooldown: 0,
+        targetRadius: null
     };
     // Face tangent to circle - rotation depends on movement direction
     // Counter-clockwise (lane -1): rotation = -angle
@@ -965,47 +1024,57 @@ function createTrafficVehicle(x, z, lane) {
 
 function createTrafficVehicles() {
     // Create traffic on both lanes of circular road (reduced for performance)
-    const numVehicles = 12; // Reduced from 20 for better performance
-    const roadRadius = 250; // Updated to match enlarged road
-    const roadWidth = 40;
+    const numVehicles = 32; // Reduced from 20 for better performance
+    const roadRadius = 350; // Updated to match road
+	const roadWidth = 40;
 
-    for (let i = 0; i < numVehicles; i++) {
-        const lane = Math.random() > 0.5 ? -1 : 1; // Inner or outer lane
-        // Inner lane (lane -1) is closer to center, outer lane (lane 1) is farther
-        const laneRadius = lane === -1 ? roadRadius - 10 : roadRadius + 10;
+	for (let i = 0; i < numVehicles; i++) {
+		const lane = Math.random() > 0.5 ? -1 : 1; // Direction: -1 CCW inner half, 1 CW outer half
+		// Randomize radius within half of the road width for the chosen direction
+		const padding = 2; // keep some buffer from edges and divider
+		const dividerGap = 4; // buffer around center divider
+		const innerMin = roadRadius - (roadWidth / 2) + padding;
+		const innerMax = roadRadius - dividerGap;
+		const outerMin = roadRadius + dividerGap;
+		const outerMax = roadRadius + (roadWidth / 2) - padding;
+		const laneRadius = lane === -1
+			? (innerMin + Math.random() * Math.max(1, (innerMax - innerMin)))
+			: (outerMin + Math.random() * Math.max(1, (outerMax - outerMin)));
 
-        // Random angle around the circle
-        const angle = Math.random() * Math.PI * 2;
-        const x = Math.cos(angle) * laneRadius;
-        const z = Math.sin(angle) * laneRadius;
+		// Random angle around the circle
+		const angle = Math.random() * Math.PI * 2;
+		const x = Math.cos(angle) * laneRadius;
+		const z = Math.sin(angle) * laneRadius;
 
-        createTrafficVehicle(x, z, lane);
-    }
+		createTrafficVehicle(x, z, lane);
+	}
 }
 
 function updateTrafficLights() {
-    // Cycle traffic lights: green for 300 frames (~5 seconds), red for 300 frames
+    // Independent per-light timers and randomized durations
     zebraCrossings.forEach(crossing => {
         crossing.lightTimer++;
 
-        if (crossing.lightTimer > 300) {
+        const duration = crossing.currentDuration || 300;
+        if (crossing.lightTimer > duration) {
             // Switch light state
             crossing.lightState = crossing.lightState === 'green' ? 'red' : 'green';
             crossing.lightTimer = 0;
+            crossing.currentDuration = crossing.lightState === 'green' ? (crossing.greenDuration || 300) : (crossing.redDuration || 300);
 
             // Update visual appearance
             if (crossing.lightObject && crossing.lightObject.userData) {
-                const redLight = crossing.lightObject.userData.redLight;
-                const greenLight = crossing.lightObject.userData.greenLight;
+                const redLights = crossing.lightObject.userData.redLights || [crossing.lightObject.userData.redLight];
+                const greenLights = crossing.lightObject.userData.greenLights || [crossing.lightObject.userData.greenLight];
 
                 if (crossing.lightState === 'red') {
                     // Red ON, Green OFF
-                    redLight.material.emissiveIntensity = 2.0;
-                    greenLight.material.emissiveIntensity = 0.1;
+                    redLights.forEach(l => l.material.emissiveIntensity = 2.0);
+                    greenLights.forEach(l => l.material.emissiveIntensity = 0.1);
                 } else {
                     // Red OFF, Green ON
-                    redLight.material.emissiveIntensity = 0.1;
-                    greenLight.material.emissiveIntensity = 2.0;
+                    redLights.forEach(l => l.material.emissiveIntensity = 0.1);
+                    greenLights.forEach(l => l.material.emissiveIntensity = 2.0);
                 }
             }
         }
@@ -1014,12 +1083,24 @@ function updateTrafficLights() {
 
 function updateTrafficVehicles() {
     trafficVehicles.forEach(vehicle => {
+        // Skip normal movement if vehicle is arrested (being towed/parked)
+        if (vehicle.userData && vehicle.userData.arrested) {
+            return;
+        }
+        // Cooldown timers
+        if (vehicle.userData.laneChangeCooldown && vehicle.userData.laneChangeCooldown > 0) {
+            vehicle.userData.laneChangeCooldown -= 1;
+        }
         // Update angle for circular movement
         const nextAngle = vehicle.userData.angle + vehicle.userData.angularSpeed;
 
-        // Calculate next position on circular path
-        const nextX = Math.cos(nextAngle) * vehicle.userData.radius;
-        const nextZ = Math.sin(nextAngle) * vehicle.userData.radius;
+		// Apply gentle lateral wobble so vehicles don't trace identical rings
+		vehicle.userData.wobblePhase += 0.003;
+		const dynamicRadius = (vehicle.userData.radius || 0) + Math.sin(vehicle.userData.wobblePhase) * (vehicle.userData.wobbleAmplitude || 1.5);
+
+		// Calculate next position on (slightly) varying circular path
+		const nextX = Math.cos(nextAngle) * dynamicRadius;
+		const nextZ = Math.sin(nextAngle) * dynamicRadius;
 
         const vehicleRadius = 2;
         let canMove = true;
@@ -1079,6 +1160,22 @@ function updateTrafficVehicles() {
                     canMove = false;
                     // Show NPC reaction
                     showNPCReaction(npc);
+					// Mark NPC as bumped by a car to trigger delayed direction change
+					npc.userData.bumpedByCarTime = performance.now();
+					// Briefly ignore vehicle collisions so NPC can escape overlap
+					npc.userData.ignoreVehicleCollisionUntil = performance.now() + 800;
+					// Nudge NPC away from the vehicle to prevent being stuck
+					const awayX = npc.position.x - nextX;
+					const awayZ = npc.position.z - nextZ;
+					const len = Math.hypot(awayX, awayZ) || 1;
+					npc.position.x += (awayX / len) * 0.6;
+					npc.position.z += (awayZ / len) * 0.6;
+                    // Track traffic vehicle offenses and possibly dispatch police
+                    vehicle.userData.npcBumpCount = (vehicle.userData.npcBumpCount || 0) + 1;
+                    if (vehicle.userData.npcBumpCount >= 3 && !vehicle.userData.policeDispatched && !vehicle.userData.exemptFromPolice) {
+                        vehicle.userData.policeDispatched = true;
+                        spawnPoliceCar(vehicle);
+                    }
                     // Slow down significantly
                     vehicle.userData.angularSpeed *= 0.5;
                     break;
@@ -1118,9 +1215,37 @@ function updateTrafficVehicles() {
             // Counter-clockwise (lane -1): rotation = -angle
             // Clockwise (lane 1): rotation = -angle + π
             vehicle.rotation.y = vehicle.userData.lane === -1 ? -vehicle.userData.angle : (-vehicle.userData.angle + Math.PI);
+
+            // Reset stuck counter when moving
+            vehicle.userData.stuckFrames = 0;
+        } else {
+            // Vehicle is blocked - track how long it's been stuck
+            vehicle.userData.stuckFrames = (vehicle.userData.stuckFrames || 0) + 1;
+
+            // Quick evasive maneuver: try adjusting radius slightly to navigate around obstacle
+            if (vehicle.userData.stuckFrames > 10 && vehicle.userData.stuckFrames < 60) {
+                // Try shifting inward or outward slightly every few frames
+                if (vehicle.userData.stuckFrames % 15 === 0) {
+                    const radiusAdjustment = (Math.random() - 0.5) * 4; // ±2 units
+                    vehicle.userData.radius += radiusAdjustment;
+
+                    // Recalculate position with new radius
+                    vehicle.position.x = Math.cos(vehicle.userData.angle) * vehicle.userData.radius;
+                    vehicle.position.z = Math.sin(vehicle.userData.angle) * vehicle.userData.radius;
+                }
+            }
+
+            // If stuck for longer, try reversing briefly to get unstuck
+            if (vehicle.userData.stuckFrames > 60 && vehicle.userData.stuckFrames < 90) {
+                // Reverse angular direction temporarily
+                vehicle.userData.angle -= vehicle.userData.angularSpeed * 2;
+                vehicle.position.x = Math.cos(vehicle.userData.angle) * vehicle.userData.radius;
+                vehicle.position.z = Math.sin(vehicle.userData.angle) * vehicle.userData.radius;
+            }
         }
 
-        // Simple collision avoidance with other traffic
+        // Simple collision avoidance with other traffic and stuck detection
+        let isTooCloseAhead = false;
         trafficVehicles.forEach(otherVehicle => {
             if (vehicle !== otherVehicle && vehicle.userData.lane === otherVehicle.userData.lane) {
                 // Calculate angular distance (accounting for wraparound)
@@ -1133,6 +1258,7 @@ function updateTrafficVehicles() {
                 if (arcDistance < 15) {
                     // Slow down if too close to vehicle ahead
                     vehicle.userData.angularSpeed *= 0.95;
+                    isTooCloseAhead = true;
                 } else if (arcDistance > 30) {
                     // Speed back up
                     const targetAngularSpeed = (0.15 + Math.random() * 0.1) / vehicle.userData.radius;
@@ -1145,6 +1271,63 @@ function updateTrafficVehicles() {
             }
         });
 
+        // Track stuck state
+        const targetAbs = Math.abs(vehicle.userData.targetAngularSpeed || 0);
+        const currentAbs = Math.abs(vehicle.userData.angularSpeed || 0);
+        if (isTooCloseAhead && currentAbs < targetAbs * 0.6) {
+            vehicle.userData.stuckTime = (vehicle.userData.stuckTime || 0) + 1;
+        } else {
+            vehicle.userData.stuckTime = 0;
+        }
+
+        // Attempt lane change if stuck for a while and cooldown expired (reduced threshold for faster response)
+        if ((vehicle.userData.stuckTime || 0) > 40 && (!vehicle.userData.laneChangeCooldown || vehicle.userData.laneChangeCooldown <= 0)) {
+            // Determine road params from crossings (fallback to defaults)
+            const rr = zebraCrossings[0] ? zebraCrossings[0].radius : 350;
+            const rw = zebraCrossings[0] ? zebraCrossings[0].roadWidth : 40;
+            const padding = 2;
+            const dividerGap = 4;
+            const innerMin = rr - (rw / 2) + padding;
+            const innerMax = rr - dividerGap;
+            const outerMin = rr + dividerGap;
+            const outerMax = rr + (rw / 2) - padding;
+
+            const newLane = vehicle.userData.lane === -1 ? 1 : -1;
+            const candidateRadius = newLane === -1
+                ? (innerMin + Math.random() * Math.max(1, (innerMax - innerMin)))
+                : (outerMin + Math.random() * Math.max(1, (outerMax - outerMin)));
+
+            // Safety check: ensure no vehicles in the target lane too close ahead
+            let safeToChange = true;
+            trafficVehicles.forEach(other => {
+                if (!safeToChange || other === vehicle) return;
+                if (other.userData.lane !== newLane) return;
+                // Compare angles
+                let angleDiff = Math.abs(vehicle.userData.angle - other.userData.angle);
+                if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                const arcDistance = angleDiff * candidateRadius;
+                if (arcDistance < 18) {
+                    safeToChange = false;
+                }
+            });
+
+            if (safeToChange) {
+                vehicle.userData.lane = newLane;
+                vehicle.userData.targetRadius = candidateRadius;
+                vehicle.userData.laneChangeCooldown = 180; // ~3 seconds (reduced for more responsive traffic)
+                vehicle.userData.stuckTime = 0;
+                vehicle.userData.stuckFrames = 0; // Reset immediate stuck counter too
+            }
+        }
+
+        // Smoothly move towards new lane radius if needed
+        if (vehicle.userData.targetRadius && Math.abs((vehicle.userData.radius || 0) - vehicle.userData.targetRadius) > 0.1) {
+            vehicle.userData.radius += (vehicle.userData.targetRadius - vehicle.userData.radius) * 0.05;
+        } else if (vehicle.userData.targetRadius) {
+            vehicle.userData.radius = vehicle.userData.targetRadius;
+            vehicle.userData.targetRadius = null;
+        }
+
         // Avoid player car (additional distance-based slowing)
         const distToCar = Math.sqrt(
             Math.pow(vehicle.position.x - car.position.x, 2) +
@@ -1156,30 +1339,31 @@ function updateTrafficVehicles() {
             vehicle.userData.angularSpeed *= 0.9;
         }
 
-        // Traffic light coordination at zebra crossings
-        let shouldStopForLight = false;
-        for (const crossing of zebraCrossings) {
-            // Calculate angular distance to crossing
-            let angleDiff = Math.abs(vehicle.userData.angle - crossing.angle);
-            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+    // Traffic light coordination at zebra crossings
+    let shouldStopForLight = false;
+    for (const crossing of zebraCrossings) {
+        // Calculate angular distance to crossing and convert to arc distance along the lane
+        let angleDiff = Math.abs(vehicle.userData.angle - crossing.angle);
+        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+        const arcDistance = angleDiff * (vehicle.userData.radius || 0);
 
-            if (angleDiff < 0.3) { // Within ~17 degrees of crossing
-                // Check traffic light state
-                if (crossing.lightState === 'red') {
-                    // STOP at red light
-                    if (angleDiff < 0.15) { // Very close to crossing
-                        vehicle.userData.angularSpeed *= 0.3; // Almost stop
-                        shouldStopForLight = true;
-                    } else {
-                        vehicle.userData.angularSpeed *= 0.8; // Slow approach
-                    }
+        const approachDistance = 50; // start reacting within 50 units (doubled)
+        const stopDistance = 14;      // near the line, almost stop on red (doubled)
+
+        if (arcDistance < approachDistance) {
+            if (crossing.lightState === 'red') {
+                if (arcDistance < stopDistance) {
+                    vehicle.userData.angularSpeed *= 0.3; // Almost stop
+                    shouldStopForLight = true;
                 } else {
-                    // Green light - gradual slowdown for safety
-                    vehicle.userData.angularSpeed *= 0.95;
+                    vehicle.userData.angularSpeed *= 0.8; // Slow approach on red
                 }
-                break;
+            } else {
+                // Green: no slowdown unless very close and needed for safety; keep speed here
             }
+            break;
         }
+    }
 
         // Speed recovery when path is clear (no obstacles, not at red light)
         if (!shouldStopForLight && canMove) {
@@ -1203,6 +1387,176 @@ function updateTrafficVehicles() {
     });
 }
 
+function spawnPoliceCar(targetVehicle) {
+	// If target not provided, default to player car
+	const target = targetVehicle || car;
+	// Do not spawn police if target is exempt
+	if (target && target.userData && target.userData.exemptFromPolice) return;
+	const police = new THREE.Group();
+	const body = new THREE.Mesh(
+		new THREE.BoxGeometry(2, 0.8, 4),
+		new THREE.MeshStandardMaterial({ color: 0x112244, metalness: 0.2, roughness: 0.6 })
+	);
+	body.position.y = 0.8;
+	police.add(body);
+
+	// Light bar
+	const bar = new THREE.Mesh(
+		new THREE.BoxGeometry(1.4, 0.2, 0.6),
+		new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 })
+	);
+	bar.position.set(0, 1.2, 0);
+	police.add(bar);
+
+	// Siren lights
+	const redSiren = new THREE.Mesh(
+		new THREE.SphereGeometry(0.2, 8, 8),
+		new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2.0 })
+	);
+	redSiren.position.set(-0.35, 1.25, 0);
+	police.add(redSiren);
+	const blueSiren = new THREE.Mesh(
+		new THREE.SphereGeometry(0.2, 8, 8),
+		new THREE.MeshStandardMaterial({ color: 0x0066ff, emissive: 0x0066ff, emissiveIntensity: 0.2 })
+	);
+	blueSiren.position.set(0.35, 1.25, 0);
+	police.add(blueSiren);
+
+	police.position.set(policeStationPosition.x, 0, policeStationPosition.z);
+	scene.add(police);
+
+	police.userData = {
+		state: 'chasing',
+		speed: 0.6,
+		target: target,
+		redSiren: redSiren,
+		blueSiren: blueSiren,
+		phase: 0
+	};
+
+	policeVehicles.push(police);
+}
+
+function updatePoliceVehicles() {
+	policeVehicles.forEach(police => {
+		// Flash sirens
+		police.userData.phase += 0.2;
+		const rOn = (Math.sin(police.userData.phase) > 0);
+		police.userData.redSiren.material.emissiveIntensity = rOn ? 2.0 : 0.2;
+		police.userData.blueSiren.material.emissiveIntensity = rOn ? 0.2 : 2.0;
+
+		if (police.userData.state === 'chasing' && police.userData.target) {
+			// If target is exempt, stop chasing
+			if (police.userData.target.userData && police.userData.target.userData.exemptFromPolice) {
+				police.userData.state = 'parked';
+				return;
+			}
+			const targetPos = police.userData.target.position;
+			const dx = targetPos.x - police.position.x;
+			const dz = targetPos.z - police.position.z;
+			const dist = Math.hypot(dx, dz);
+			if (dist > 1) {
+				const dirX = dx / dist;
+				const dirZ = dz / dist;
+				police.position.x += dirX * police.userData.speed;
+				police.position.z += dirZ * police.userData.speed;
+				police.rotation.y = Math.atan2(dirX, dirZ);
+			} else {
+				// Arrest and tow
+				if (police.userData.target === car) {
+					car.userData.arrested = true;
+				} else {
+					police.userData.target.userData.arrested = true;
+				}
+				police.userData.state = 'towing';
+			}
+		} else if (police.userData.state === 'towing') {
+			// Move both to police station parking
+			const targetX = policeStationPosition.x + 0;
+			const targetZ = policeStationPosition.z - 8;
+			const dx = targetX - police.position.x;
+			const dz = targetZ - police.position.z;
+			const dist = Math.hypot(dx, dz);
+			if (dist > 0.5) {
+				const dirX = dx / dist;
+				const dirZ = dz / dist;
+				police.position.x += dirX * (police.userData.speed * 0.8);
+				police.position.z += dirZ * (police.userData.speed * 0.8);
+				police.rotation.y = Math.atan2(dirX, dirZ);
+				// Tow target vehicle behind
+				const target = police.userData.target;
+				if (target) {
+					target.position.x = police.position.x - Math.sin(police.rotation.y) * 3;
+					target.position.z = police.position.z - Math.cos(police.rotation.y) * 3;
+					target.rotation.y = police.rotation.y;
+				}
+			} else {
+				police.userData.state = 'parked';
+				// If target was a traffic vehicle, remove it from traffic and leave it at station
+				const target = police.userData.target;
+				if (target && target !== car) {
+					trafficVehicles = trafficVehicles.filter(v => v !== target);
+				}
+				// Start 60s release timer
+				police.userData.releaseAt = performance.now() + 60000;
+			}
+		}
+		else if (police.userData.state === 'parked') {
+			// Wait for release
+			if (performance.now() >= (police.userData.releaseAt || 0)) {
+				const target = police.userData.target;
+				if (target) {
+					// Reset offense state
+					target.userData.arrested = false;
+					target.userData.policeDispatched = false;
+					target.userData.npcBumpCount = 0;
+
+					if (target === car) {
+						// Reposition player car to starting spot and enable control
+						car.position.set(0, 0, 60);
+						car.rotation.y = 0;
+						car.userData.arrested = false;
+					} else {
+						// Respawn traffic vehicle onto circular road with fresh lane and angle
+                        const roadRadius = 350;
+                        const roadWidth = 40;
+						const padding = 2;
+						const dividerGap = 4;
+						const innerMin = roadRadius - (roadWidth / 2) + padding;
+						const innerMax = roadRadius - dividerGap;
+						const outerMin = roadRadius + dividerGap;
+						const outerMax = roadRadius + (roadWidth / 2) - padding;
+						const lane = Math.random() > 0.5 ? -1 : 1;
+						const laneRadius = lane === -1
+							? (innerMin + Math.random() * Math.max(1, (innerMax - innerMin)))
+							: (outerMin + Math.random() * Math.max(1, (outerMax - outerMin)));
+						const angle = Math.random() * Math.PI * 2;
+						target.userData.lane = lane;
+						target.userData.radius = laneRadius;
+						target.userData.angle = angle;
+						const targetSpeed = (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1);
+						target.userData.angularSpeed = targetSpeed;
+						target.userData.targetAngularSpeed = targetSpeed;
+						target.position.x = Math.cos(angle) * laneRadius;
+						target.position.z = Math.sin(angle) * laneRadius;
+						target.rotation.y = lane === -1 ? -angle : (-angle + Math.PI);
+						// Ensure it's in the traffic list
+						if (!trafficVehicles.includes(target)) {
+							trafficVehicles.push(target);
+						}
+					}
+				}
+				// Despawn police vehicle
+				scene.remove(police);
+				policeVehicles = policeVehicles.filter(p => p !== police);
+			}
+		}
+
+		// Update arrest count display per frame
+		updatePoliceArrestBoard();
+	});
+}
+
 function updateNPCs() {
     npcs.forEach(npc => {
         if (npc.userData.isPaused) {
@@ -1215,6 +1569,16 @@ function updateNPCs() {
             return;
         }
 
+		// If NPC was bumped by a car, after 1 second change direction to left/right/forward/backward
+		if (npc.userData.bumpedByCarTime) {
+			const elapsed = performance.now() - npc.userData.bumpedByCarTime;
+			if (elapsed >= 1000) {
+				const offsets = [0, Math.PI / 2, -Math.PI / 2, Math.PI];
+				npc.userData.direction += offsets[Math.floor(Math.random() * offsets.length)];
+				delete npc.userData.bumpedByCarTime;
+			}
+		}
+
         npc.userData.walkTime += npc.userData.speed;
 
         // Animate legs
@@ -1224,7 +1588,7 @@ function updateNPCs() {
 
         // Zebra crossing logic for circular road (enlarged to encompass city)
         const distFromCenter = Math.sqrt(npc.position.x * npc.position.x + npc.position.z * npc.position.z);
-        const roadRadius = 250; // Updated to match enlarged road
+        const roadRadius = 250; // Match original NPC logic radius
         const roadWidth = 40;
         const currentlyOnRoad = distFromCenter > roadRadius - roadWidth / 2 && distFromCenter < roadRadius + roadWidth / 2;
 
@@ -1365,9 +1729,15 @@ function updateNPCs() {
 
         // Check collision with traffic vehicles
         if (canMove) {
-            for (const vehicle of trafficVehicles) {
+			for (const vehicle of trafficVehicles) {
                 const vehicleRadius = 2;
-                if (checkCollision({ x: newX, z: newZ }, npcRadius, vehicle.position, vehicleRadius)) {
+				// Allow brief grace period after being bumped to avoid re-colliding while escaping
+				const ignoreUntil = npc.userData.ignoreVehicleCollisionUntil || 0;
+				const nowTs = performance.now();
+				if (nowTs < ignoreUntil) {
+					continue;
+				}
+				if (checkCollision({ x: newX, z: newZ }, npcRadius, vehicle.position, vehicleRadius)) {
                     canMove = false;
                     // Turn to avoid vehicle
                     const angleToVehicle = Math.atan2(
@@ -1388,7 +1758,7 @@ function updateNPCs() {
         npc.rotation.y = npc.userData.direction;
 
         // Keep within bounds (4x scale)
-        const bounds = 160;
+        const bounds = 320;
         if (Math.abs(npc.position.x) > bounds || Math.abs(npc.position.z) > bounds) {
             npc.userData.direction += Math.PI;
         }
@@ -2040,6 +2410,13 @@ function createCar() {
     // Position car at start (4x scale)
     car.position.set(0, 0, 60);
     scene.add(car);
+
+	// Initialize bump tracking and arrest flags
+	car.userData = car.userData || {};
+	car.userData.npcBumpCount = 0;
+	car.userData.policeDispatched = false;
+	car.userData.arrested = false;
+	car.userData.exemptFromPolice = true;
 }
 
 function createEnvironment() {
@@ -2127,6 +2504,81 @@ function createEnvironment() {
         marker.receiveShadow = true;
         scene.add(marker);
     }
+
+	// Create police station outside the outer circle
+	createPoliceStation(isDark);
+}
+
+function createPoliceStation(isDark) {
+	const station = new THREE.Group();
+
+	// Building base
+	const base = new THREE.Mesh(
+		new THREE.BoxGeometry(30, 12, 20),
+		new THREE.MeshStandardMaterial({ color: isDark ? 0x1e3a5f : 0x6fa8dc, roughness: 0.8 })
+	);
+	base.position.set(0, 6, 0);
+	base.castShadow = true;
+	base.receiveShadow = true;
+	station.add(base);
+
+	// Sign
+	const sign = new THREE.Mesh(
+		new THREE.BoxGeometry(16, 3, 1),
+		new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: isDark ? 0x3366ff : 0x2244aa, emissiveIntensity: 0.4 })
+	);
+	sign.position.set(0, 12, 10.5);
+	station.add(sign);
+
+	// Simple text-like bars to indicate "POLICE"
+	for (let i = -6; i <= 6; i += 3) {
+		const bar = new THREE.Mesh(
+			new THREE.BoxGeometry(1, 2, 0.6),
+			new THREE.MeshStandardMaterial({ color: 0x222222 })
+		);
+		bar.position.set(i, 12, 11);
+		station.add(bar);
+	}
+
+	// Parking pad
+	const pad = new THREE.Mesh(
+		new THREE.PlaneGeometry(36, 28),
+		new THREE.MeshStandardMaterial({ color: isDark ? 0x111111 : 0xbbbbbb, roughness: 1.0 })
+	);
+	pad.rotation.x = -Math.PI / 2;
+	pad.position.set(0, 0.02, -5);
+	pad.receiveShadow = true;
+	station.add(pad);
+
+	station.position.set(policeStationPosition.x, 0, policeStationPosition.z);
+	scene.add(station);
+	policeStation = station;
+
+	// Arrest count board
+	policeArrestBoard = createTextBoard('ARRESTED: 0', 24, 8, '#ffffff', '#2d2d2d', true);
+	policeArrestBoard.position.set(policeStationPosition.x, 10, policeStationPosition.z - 14);
+	policeArrestBoard.rotation.y = Math.PI;
+	scene.add(policeArrestBoard);
+}
+
+function updatePoliceArrestBoard() {
+	if (!policeArrestBoard) return;
+	let count = 0;
+	if (car && car.userData && car.userData.arrested) count++;
+	policeVehicles.forEach(p => {
+		const t = p.userData && p.userData.target;
+		if (t && t !== car && t.userData && t.userData.arrested) count++;
+	});
+	if (count !== lastArrestCount) {
+		lastArrestCount = count;
+		// Replace texture on the existing board
+		const newBoard = createTextBoard(`ARRESTED: ${count}`, 24, 8, '#ffffff', '#2d2d2d', true);
+		if (policeArrestBoard.material && policeArrestBoard.material.map) {
+			policeArrestBoard.material.map.dispose();
+		}
+		policeArrestBoard.material.map = newBoard.material.map;
+		policeArrestBoard.material.needsUpdate = true;
+	}
 }
 
 function addEventListeners() {
@@ -2255,6 +2707,12 @@ function checkCollision(pos1, radius1, pos2, radius2) {
 }
 
 function updateCar() {
+	// Disable control if arrested
+	if (car && car.userData && car.userData.arrested) {
+		carSpeed = 0;
+		updateEngineSound(carSpeed);
+		return;
+	}
     // Check for shift boost (2x speed multiplier)
     const isShiftPressed = keysPressed['ShiftLeft'] || keysPressed['ShiftRight'];
     const speedMultiplier = isShiftPressed ? 2.0 : 1.0;
@@ -2296,15 +2754,15 @@ function updateCar() {
     // Update engine sound based on speed
     updateEngineSound(carSpeed);
 
-    // Slow down near zebra crossings (circular road)
+    // Slow down near zebra crossings ONLY if the light is red
     for (const crossing of zebraCrossings) {
         // Calculate distance to crossing using x,z coordinates
         const distToCrossing = Math.sqrt(
             Math.pow(car.position.x - crossing.x, 2) +
             Math.pow(car.position.z - crossing.z, 2)
         );
-        if (distToCrossing < 30) {
-            // Gradual slowdown approaching crossing
+        if (crossing.lightState === 'red' && distToCrossing < 60) {
+            // Gradual slowdown approaching red light only
             carSpeed *= 0.92;
             break;
         }
@@ -2412,6 +2870,19 @@ function updateCar() {
 
             // Show NPC reaction
             showNPCReaction(npc);
+
+			// Mark NPC as bumped by the player car to trigger delayed direction change
+			npc.userData.bumpedByCarTime = performance.now();
+
+			// Increment player's bump counter and possibly dispatch police (skip if exempt)
+			car.userData = car.userData || {};
+			if (!car.userData.exemptFromPolice) {
+				car.userData.npcBumpCount = (car.userData.npcBumpCount || 0) + 1;
+            if (car.userData.npcBumpCount >= 3 && !car.userData.policeDispatched) {
+                car.userData.policeDispatched = true;
+                spawnPoliceCar(car);
+				}
+			}
 
             // Push NPC away
             const pushDir = {
@@ -2605,6 +3076,9 @@ function animate() {
 
     // Update traffic vehicles
     updateTrafficVehicles();
+
+	// Update police vehicles
+	updatePoliceVehicles();
 
     // Rotate car body slightly based on turning
     if (carBody) {
