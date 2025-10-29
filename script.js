@@ -825,9 +825,68 @@ function updateNPCs() {
         if (npc.children[2]) npc.children[2].rotation.x = legSwing;
         if (npc.children[3]) npc.children[3].rotation.x = -legSwing;
 
-        // Move NPC
-        npc.position.x += Math.sin(npc.userData.direction) * npc.userData.speed;
-        npc.position.z += Math.cos(npc.userData.direction) * npc.userData.speed;
+        // Calculate next position
+        const newX = npc.position.x + Math.sin(npc.userData.direction) * npc.userData.speed;
+        const newZ = npc.position.z + Math.cos(npc.userData.direction) * npc.userData.speed;
+        const npcRadius = 0.5;
+
+        let canMove = true;
+
+        // Check collision with static objects (trees, rocks, benches, etc.)
+        for (const obj of staticObjects) {
+            const objRadius = obj.userData.radius || 2;
+            if (checkCollision({ x: newX, z: newZ }, npcRadius, obj.position, objRadius)) {
+                canMove = false;
+                // Turn away from obstacle
+                const angleToObj = Math.atan2(
+                    npc.position.x - obj.position.x,
+                    npc.position.z - obj.position.z
+                );
+                npc.userData.direction = angleToObj + (Math.random() - 0.5) * Math.PI / 2;
+                break;
+            }
+        }
+
+        // Check collision with movable objects (barrels, cones, buckets, etc.)
+        if (canMove) {
+            for (const obj of movableObjects) {
+                const objRadius = 1;
+                if (checkCollision({ x: newX, z: newZ }, npcRadius, obj.position, objRadius)) {
+                    canMove = false;
+                    // Turn away from obstacle
+                    const angleToObj = Math.atan2(
+                        npc.position.x - obj.position.x,
+                        npc.position.z - obj.position.z
+                    );
+                    npc.userData.direction = angleToObj + (Math.random() - 0.5) * Math.PI / 2;
+                    break;
+                }
+            }
+        }
+
+        // Check collision with other NPCs
+        if (canMove) {
+            for (const otherNpc of npcs) {
+                if (otherNpc !== npc) {
+                    if (checkCollision({ x: newX, z: newZ }, npcRadius, otherNpc.position, npcRadius)) {
+                        canMove = false;
+                        // Turn to avoid other NPC
+                        const angleToNpc = Math.atan2(
+                            npc.position.x - otherNpc.position.x,
+                            npc.position.z - otherNpc.position.z
+                        );
+                        npc.userData.direction = angleToNpc + (Math.random() - 0.5) * Math.PI / 2;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Apply movement if no collision
+        if (canMove) {
+            npc.position.x = newX;
+            npc.position.z = newZ;
+        }
         npc.rotation.y = npc.userData.direction;
 
         // Keep within bounds (4x scale)
