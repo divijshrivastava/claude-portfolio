@@ -3134,7 +3134,11 @@ window.addEventListener('DOMContentLoaded', () => {
             progress = 100;
             clearInterval(loadingInterval);
             setTimeout(() => {
-                document.getElementById('loadingScreen').classList.add('hidden');
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.classList.add('hidden');
+                    loadingScreen.style.display = 'none'; // Extra safety
+                }
                 init();
                 setupMobileControls();
             }, 500);
