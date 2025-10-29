@@ -942,3 +942,57 @@ body {
         opacity: 1;
     }
 }
+
+/* Conversation Bubbles */
+.conversation-bubble {
+    position: fixed;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.95), rgba(107, 43, 255, 0.9));
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    max-width: 300px;
+    box-shadow: 0 8px 24px rgba(0, 212, 255, 0.6), 0 0 40px rgba(107, 43, 255, 0.4);
+    pointer-events: none;
+    z-index: 9996;
+    transform: translate(-50%, -100%);
+    animation: conversationPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-align: center;
+    line-height: 1.4;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.conversation-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid rgba(107, 43, 255, 0.9);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+[data-theme="dark"] .conversation-bubble {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.98), rgba(107, 43, 255, 0.95));
+    box-shadow: 0 8px 24px rgba(0, 212, 255, 0.8), 0 0 50px rgba(107, 43, 255, 0.6);
+}
+
+@keyframes conversationPop {
+    0% {
+        transform: translate(-50%, -100%) scale(0.5);
+        opacity: 0;
+    }
+    70% {
+        transform: translate(-50%, -100%) scale(1.05);
+    }
+    100% {
+        transform: translate(-50%, -100%) scale(1);
+        opacity: 1;
+    }
+}

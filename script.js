@@ -39,6 +39,25 @@ let billboards = [];
 let npcs = [];
 let trafficVehicles = [];
 
+// NPC Conversations
+const npcConversations = [
+    ["Hey there!", "Nice ride you got!", "Have a great day!"],
+    ["Welcome to the city!", "Lots to explore here!", "Check out the skill areas!"],
+    ["Hi! I'm a software engineer too!", "Been coding for years!", "Love this city!"],
+    ["Beautiful day, isn't it?", "Traffic is crazy today!", "Stay safe out there!"],
+    ["New around here?", "You should visit the career mountains!", "They're amazing!"],
+    ["Yo! Cool car!", "Where'd you get it?", "See you around!"],
+    ["Greetings!", "This portfolio is impressive!", "Keep driving!"],
+    ["Hey friend!", "Looking for something?", "Everything's labeled here!"],
+    ["Nice to meet you!", "I love this cyberpunk theme!", "So futuristic!"],
+    ["Howdy!", "Watch out for the traffic!", "Drive safe!"],
+    ["Hello there!", "Beautiful architecture, right?", "Enjoy your visit!"],
+    ["Hi!", "Have you collected all skills?", "Good luck!"],
+    ["What's up?", "Great weather for driving!", "Take care!"],
+    ["Hey!", "This city never sleeps!", "Just like NYC!"],
+    ["Good to see you!", "Check out the lily pond!", "It's relaxing!"]
+];
+
 // Audio context and sounds
 let audioContext;
 let engineSound, accelerateSound, collisionSound, objectHitSound;
@@ -282,6 +301,38 @@ function showSkillBubble(skillName, screenX, screenY) {
     setTimeout(() => {
         bubble.remove();
     }, 2000);
+}
+
+function showConversationBubble(npc, message) {
+    // Get screen position of NPC
+    const vector = new THREE.Vector3();
+    npc.getWorldPosition(vector);
+    vector.y += 2.5; // Position above NPC head
+    vector.project(camera);
+
+    const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
+    const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+    // Create bubble element
+    const bubble = document.createElement('div');
+    bubble.className = 'conversation-bubble';
+    bubble.style.left = screenX + 'px';
+    bubble.style.top = screenY + 'px';
+    bubble.textContent = message;
+    bubble.setAttribute('data-npc-id', npc.uuid);
+
+    document.body.appendChild(bubble);
+
+    // Return bubble for tracking
+    return bubble;
+}
+
+function removeConversationBubbles(npcId) {
+    const bubbles = document.querySelectorAll(`.conversation-bubble[data-npc-id="${npcId}"]`);
+    bubbles.forEach(bubble => {
+        bubble.classList.add('fade-out');
+        setTimeout(() => bubble.remove(), 300);
+    });
 }
 
 function collectSkill(skillObj) {
@@ -578,13 +629,17 @@ function createNPC(x, z, color) {
 
     npc.position.set(x, 0, z);
 
-    // NPC movement data
+    // NPC movement and conversation data
     npc.userData = {
         speed: 0.02 + Math.random() * 0.02,
         direction: Math.random() * Math.PI * 2,
         walkTime: 0,
         pauseTime: 0,
-        isPaused: false
+        isPaused: false,
+        proximityTime: 0,
+        isTalking: false,
+        hasSpoken: false,
+        conversationIndex: 0
     };
 
     scene.add(npc);
@@ -786,7 +841,7 @@ function updateNPCs() {
             npc.userData.isPaused = true;
         }
 
-        // Avoid car (4x scale)
+        // Avoid car (4x scale) and track proximity for conversations
         const distToCar = Math.sqrt(
             Math.pow(npc.position.x - car.position.x, 2) +
             Math.pow(npc.position.z - car.position.z, 2)
@@ -799,8 +854,64 @@ function updateNPCs() {
                 npc.position.z - car.position.z
             );
             npc.userData.direction = angleToCar;
+
+            // Track proximity time for conversations (within 10 units)
+            if (distToCar < 10) {
+                npc.userData.proximityTime++;
+
+                // After 5 seconds (300 frames at 60fps), start conversation
+                if (npc.userData.proximityTime >= 300 && !npc.userData.hasSpoken) {
+                    startNPCConversation(npc);
+                }
+            } else {
+                // Reset proximity timer if car moves away
+                if (npc.userData.proximityTime > 0 && !npc.userData.isTalking) {
+                    npc.userData.proximityTime = 0;
+                }
+            }
+        } else {
+            // Reset proximity timer if far away
+            if (npc.userData.proximityTime > 0 && !npc.userData.isTalking) {
+                npc.userData.proximityTime = 0;
+            }
         }
     });
+}
+
+function startNPCConversation(npc) {
+    // Pick a random conversation set
+    const conversationSet = npcConversations[Math.floor(Math.random() * npcConversations.length)];
+    npc.userData.conversation = conversationSet;
+    npc.userData.conversationIndex = 0;
+    npc.userData.isTalking = true;
+    npc.userData.hasSpoken = true;
+
+    // Show first message
+    showNextMessage(npc);
+}
+
+function showNextMessage(npc) {
+    if (!npc.userData.conversation || npc.userData.conversationIndex >= npc.userData.conversation.length) {
+        // Conversation complete
+        npc.userData.isTalking = false;
+        removeConversationBubbles(npc.uuid);
+        return;
+    }
+
+    // Remove previous bubble
+    removeConversationBubbles(npc.uuid);
+
+    // Show current message
+    const message = npc.userData.conversation[npc.userData.conversationIndex];
+    showConversationBubble(npc, message);
+
+    // Move to next message after 2 seconds
+    npc.userData.conversationIndex++;
+    setTimeout(() => {
+        if (npc.userData.isTalking) {
+            showNextMessage(npc);
+        }
+    }, 2000);
 }
 
 function createSkillBuckets() {
