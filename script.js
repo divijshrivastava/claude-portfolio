@@ -769,21 +769,46 @@ function createTrafficVehicles() {
 
 function updateTrafficVehicles() {
     trafficVehicles.forEach(vehicle => {
-        // Move vehicle forward in its lane
+        // Calculate next position
+        let nextZ = vehicle.position.z;
         if (vehicle.userData.lane === -1) {
             // Left lane going down (negative z)
-            vehicle.position.z -= vehicle.userData.speed;
-
-            // Loop back to start when reaching end
-            if (vehicle.position.z < -280) {
-                vehicle.position.z = 80;
-            }
+            nextZ -= vehicle.userData.speed;
         } else {
             // Right lane going up (positive z)
-            vehicle.position.z += vehicle.userData.speed;
+            nextZ += vehicle.userData.speed;
+        }
+
+        const vehicleRadius = 2;
+        let canMove = true;
+
+        // Check collision with NPCs
+        for (const npc of npcs) {
+            const npcRadius = 0.5;
+            if (checkCollision({ x: vehicle.position.x, z: nextZ }, vehicleRadius, npc.position, npcRadius)) {
+                canMove = false;
+                // Slow down significantly
+                vehicle.userData.speed = Math.max(0.02, vehicle.userData.speed * 0.5);
+                break;
+            }
+        }
+
+        // Check collision with player car
+        const carRadius = 2;
+        if (canMove && checkCollision({ x: vehicle.position.x, z: nextZ }, vehicleRadius, car.position, carRadius)) {
+            canMove = false;
+            // Stop or slow down significantly
+            vehicle.userData.speed = Math.max(0.01, vehicle.userData.speed * 0.3);
+        }
+
+        // Apply movement if no collision
+        if (canMove) {
+            vehicle.position.z = nextZ;
 
             // Loop back to start when reaching end
-            if (vehicle.position.z > 80) {
+            if (vehicle.userData.lane === -1 && vehicle.position.z < -280) {
+                vehicle.position.z = 80;
+            } else if (vehicle.userData.lane === 1 && vehicle.position.z > 80) {
                 vehicle.position.z = -280;
             }
         }
@@ -804,7 +829,7 @@ function updateTrafficVehicles() {
             }
         });
 
-        // Avoid player car
+        // Avoid player car (additional distance-based slowing)
         const distToCar = Math.sqrt(
             Math.pow(vehicle.position.x - car.position.x, 2) +
             Math.pow(vehicle.position.z - car.position.z, 2)
@@ -889,6 +914,23 @@ function updateNPCs() {
                         npc.userData.direction = angleToNpc + (Math.random() - 0.5) * Math.PI / 2;
                         break;
                     }
+                }
+            }
+        }
+
+        // Check collision with traffic vehicles
+        if (canMove) {
+            for (const vehicle of trafficVehicles) {
+                const vehicleRadius = 2;
+                if (checkCollision({ x: newX, z: newZ }, npcRadius, vehicle.position, vehicleRadius)) {
+                    canMove = false;
+                    // Turn to avoid vehicle
+                    const angleToVehicle = Math.atan2(
+                        npc.position.x - vehicle.position.x,
+                        npc.position.z - vehicle.position.z
+                    );
+                    npc.userData.direction = angleToVehicle + (Math.random() - 0.5) * Math.PI / 2;
+                    break;
                 }
             }
         }
@@ -1816,6 +1858,71 @@ function updateCar() {
         }
     }
 
+    // Check collision with traffic vehicles
+    for (const vehicle of trafficVehicles) {
+        const vehicleRadius = 2;
+        if (checkCollision({ x: newX, z: newZ }, carRadius, vehicle.position, vehicleRadius)) {
+            canMove = false;
+            collisionIntensity = Math.abs(carSpeed);
+            playCollisionSound(collisionIntensity);
+
+            // Calculate push direction
+            const pushDir = {
+                x: vehicle.position.x - newX,
+                z: vehicle.position.z - newZ
+            };
+            const pushDist = Math.sqrt(pushDir.x * pushDir.x + pushDir.z * pushDir.z);
+
+            if (pushDist > 0.1) {
+                pushDir.x /= pushDist;
+                pushDir.z /= pushDist;
+
+                // Push the traffic vehicle based on player car speed
+                const pushForce = Math.abs(carSpeed) * 2;
+                vehicle.position.x += pushDir.x * pushForce;
+                vehicle.position.z += pushDir.z * pushForce;
+            }
+
+            // Bounce back player car
+            carSpeed *= -0.4;
+            break;
+        }
+    }
+
+    // Check collision with NPCs
+    for (const npc of npcs) {
+        const npcRadius = 0.5;
+        if (checkCollision({ x: newX, z: newZ }, carRadius, npc.position, npcRadius)) {
+            canMove = false;
+            collisionIntensity = Math.abs(carSpeed) * 0.5;
+            playCollisionSound(collisionIntensity);
+
+            // Push NPC away
+            const pushDir = {
+                x: npc.position.x - newX,
+                z: npc.position.z - newZ
+            };
+            const pushDist = Math.sqrt(pushDir.x * pushDir.x + pushDir.z * pushDir.z);
+
+            if (pushDist > 0.1) {
+                pushDir.x /= pushDist;
+                pushDir.z /= pushDist;
+
+                // Push the NPC
+                const pushForce = Math.abs(carSpeed) * 1.5;
+                npc.position.x += pushDir.x * pushForce;
+                npc.position.z += pushDir.z * pushForce;
+
+                // Make NPC turn away
+                npc.userData.direction = Math.atan2(pushDir.x, pushDir.z);
+            }
+
+            // Slow down car
+            carSpeed *= 0.6;
+            break;
+        }
+    }
+
     // Apply movement if no collision with static objects
     if (canMove) {
         car.position.x = newX;
@@ -1899,6 +2006,76 @@ function updateCar() {
     camera.lookAt(car.position);
 }
 
+// Mobile controls setup
+function setupMobileControls() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+                     || (window.innerWidth <= 768);
+
+    const mobileControls = document.getElementById('mobileControls');
+    const instructions = document.getElementById('instructions');
+
+    if (isMobile && mobileControls) {
+        mobileControls.style.display = 'block';
+        if (instructions) {
+            instructions.style.display = 'none';
+        }
+
+        // Button references
+        const upBtn = document.getElementById('upBtn');
+        const downBtn = document.getElementById('downBtn');
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+
+        // Touch event handlers for forward button
+        if (upBtn) {
+            upBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                keysPressed['KeyW'] = true;
+            });
+            upBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keysPressed['KeyW'] = false;
+            });
+        }
+
+        // Touch event handlers for backward button
+        if (downBtn) {
+            downBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                keysPressed['KeyS'] = true;
+            });
+            downBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keysPressed['KeyS'] = false;
+            });
+        }
+
+        // Touch event handlers for left button
+        if (leftBtn) {
+            leftBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                keysPressed['KeyA'] = true;
+            });
+            leftBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keysPressed['KeyA'] = false;
+            });
+        }
+
+        // Touch event handlers for right button
+        if (rightBtn) {
+            rightBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                keysPressed['KeyD'] = true;
+            });
+            rightBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keysPressed['KeyD'] = false;
+            });
+        }
+    }
+}
+
 function animate() {
     requestAnimationFrame(animate);
 
@@ -1963,6 +2140,7 @@ window.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 document.getElementById('loadingScreen').classList.add('hidden');
                 init();
+                setupMobileControls();
             }, 500);
         }
         loadingProgress.style.width = progress + '%';

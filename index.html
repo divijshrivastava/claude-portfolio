@@ -56,8 +56,36 @@
         </div>
 
         <!-- Instructions -->
-        <div class="instructions">
+        <div class="instructions" id="instructions">
             <p><strong>Drive:</strong> W/A/S/D or Arrows | <strong>Scroll:</strong> Camera Angle</p>
+        </div>
+
+        <!-- Mobile Controls -->
+        <div class="mobile-controls" id="mobileControls" style="display: none;">
+            <div class="mobile-joystick">
+                <button class="mobile-btn up-btn" id="upBtn" aria-label="Forward">
+                    <svg viewBox="0 0 24 24" width="32" height="32">
+                        <path fill="currentColor" d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/>
+                    </svg>
+                </button>
+                <div class="mobile-horizontal-btns">
+                    <button class="mobile-btn left-btn" id="leftBtn" aria-label="Left">
+                        <svg viewBox="0 0 24 24" width="32" height="32">
+                            <path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/>
+                        </svg>
+                    </button>
+                    <button class="mobile-btn right-btn" id="rightBtn" aria-label="Right">
+                        <svg viewBox="0 0 24 24" width="32" height="32">
+                            <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
+                        </svg>
+                    </button>
+                </div>
+                <button class="mobile-btn down-btn" id="downBtn" aria-label="Backward">
+                    <svg viewBox="0 0 24 24" width="32" height="32">
+                        <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <!-- Social Links -->
