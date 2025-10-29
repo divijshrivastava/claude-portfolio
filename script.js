@@ -533,8 +533,8 @@ function createUrbanGround(isDark) {
     // Add sidewalks
     createSidewalks(isDark);
 
-    // Add city buildings in background
-    createCityBuildings(isDark);
+    // Buildings removed - CV content should be unobstructed and prominent
+    // createCityBuildings(isDark);
 }
 
 function createRoadMarkings() {
@@ -663,6 +663,7 @@ function createSidewalks(isDark) {
     scene.add(rightSidewalk);
 }
 
+// FUNCTION DISABLED - Buildings removed to prioritize CV/resume visibility
 function createCityBuildings(isDark) {
     const buildingColor = isDark ? 0x1a2340 : 0x8896b0;
     const windowColor = isDark ? 0x00d4ff : 0x6b2bff; // Cyan / purple windows
