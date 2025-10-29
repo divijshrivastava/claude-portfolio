@@ -620,7 +620,7 @@ function createCircularZebraCrossing(angle, roadRadius, roadWidth, isDark) {
         });
         const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
         stripe.rotation.x = -Math.PI / 2;
-        stripe.rotation.z = -angle; // Rotate to align with road direction
+        stripe.rotation.z = angle; // Rotate to be perpendicular to road (radial direction)
         stripe.position.set(x, 0.03, z);
         stripe.receiveShadow = true;
         scene.add(stripe);
@@ -878,7 +878,8 @@ function createTrafficVehicle(x, z, lane) {
         angularSpeed: (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1), // Clockwise or counter-clockwise
         lane: lane
     };
-    vehicle.rotation.y = -angle + Math.PI / 2; // Face tangent to circle
+    // Face tangent to circle: inner lane (counter-clockwise) = angle + π/2, outer lane (clockwise) = angle - π/2
+    vehicle.rotation.y = angle + (lane === -1 ? Math.PI / 2 : -Math.PI / 2);
 
     scene.add(vehicle);
     trafficVehicles.push(vehicle);
@@ -945,7 +946,9 @@ function updateTrafficVehicles() {
             vehicle.position.x = nextX;
             vehicle.position.z = nextZ;
             // Update rotation to face tangent direction
-            vehicle.rotation.y = -vehicle.userData.angle + Math.PI / 2;
+            // Inner lane (lane -1): counter-clockwise, tangent is angle + π/2
+            // Outer lane (lane 1): clockwise, tangent is angle - π/2
+            vehicle.rotation.y = vehicle.userData.angle + (vehicle.userData.lane === -1 ? Math.PI / 2 : -Math.PI / 2);
         }
 
         // Simple collision avoidance with other traffic
@@ -1681,7 +1684,7 @@ function createInteractiveObjects() {
     // Traffic cones (4x scale)
     const conePositions = [
         { x: 0, z: 20 }, { x: 12, z: 0 }, { x: -12, z: 0 },
-        { x: 60, z: -80 }, { x: -60, z: -80 }
+        { x: 40, z: -60 }, { x: -40, z: -60 } // Moved from (±60, -80) to avoid circular road
     ];
 
     conePositions.forEach(pos => {
@@ -1816,8 +1819,7 @@ function createEnvironment() {
     const treePositions = [
         { x: -140, z: 40 }, { x: -140, z: -40 }, { x: -140, z: -120 }, { x: -140, z: -200 },
         { x: 140, z: 40 }, { x: 140, z: -40 }, { x: 140, z: -120 }, { x: 140, z: -200 },
-        { x: -40, z: 72 }, { x: 40, z: 72 },
-        // Tree at (0, -280) removed as it was on the road
+        { x: -40, z: 40 }, { x: 40, z: 40 }, // Moved from z=72 to avoid circular road
         // Add more trees for better boundaries
         { x: -72, z: -140 }, { x: 72, z: -140 }
     ];
