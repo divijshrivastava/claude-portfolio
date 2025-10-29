@@ -284,6 +284,25 @@ body {
     gap: 0.5rem;
 }
 
+.points-display-bottom {
+    position: fixed;
+    bottom: 2rem;
+    left: 2rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--overlay-bg);
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 50;
+    pointer-events: auto;
+}
+
 .points-label {
     color: var(--text-secondary);
 }
