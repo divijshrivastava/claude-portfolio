@@ -540,8 +540,13 @@ function createUrbanGround(isDark) {
 function createRoadMarkings() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Main road down the center (4x larger) - neon style
-    const roadGeometry = new THREE.PlaneGeometry(48, 720);
+    // Create circular road around the city
+    const roadRadius = 100; // Radius of the circular road
+    const roadWidth = 40; // Width of the road
+    const segments = 64;
+
+    // Create road using RingGeometry for a circular road
+    const roadGeometry = new THREE.RingGeometry(roadRadius - roadWidth / 2, roadRadius + roadWidth / 2, segments);
     const roadMaterial = new THREE.MeshStandardMaterial({
         color: isDark ? 0x0a0e1f : 0x8896b0,
         roughness: 0.7,
@@ -551,13 +556,18 @@ function createRoadMarkings() {
     });
     const road = new THREE.Mesh(roadGeometry, roadMaterial);
     road.rotation.x = -Math.PI / 2;
-    road.position.set(0, 0.01, -40);
+    road.position.set(0, 0.01, 0);
     road.receiveShadow = true;
     scene.add(road);
 
-    // Road lane markings - electric cyan/neon (4x spacing and size)
-    for (let z = 80; z > -320; z -= 32) {
-        const lineGeometry = new THREE.PlaneGeometry(2, 12);
+    // Lane markings - dashed lines around the circle
+    const numDashes = 32;
+    for (let i = 0; i < numDashes; i++) {
+        const angle = (i / numDashes) * Math.PI * 2;
+        const x = Math.cos(angle) * roadRadius;
+        const z = Math.sin(angle) * roadRadius;
+
+        const lineGeometry = new THREE.PlaneGeometry(2, 8);
         const lineMaterial = new THREE.MeshStandardMaterial({
             color: isDark ? 0x00d4ff : 0x0099cc,
             emissive: isDark ? 0x00d4ff : 0x00d4ff,
@@ -565,32 +575,41 @@ function createRoadMarkings() {
         });
         const line = new THREE.Mesh(lineGeometry, lineMaterial);
         line.rotation.x = -Math.PI / 2;
-        line.position.set(0, 0.02, z);
+        line.rotation.z = -angle; // Rotate to align with circle
+        line.position.set(x, 0.02, z);
         scene.add(line);
     }
 
-    // Create zebra crossings at strategic locations
-    const crossingPositions = [-200, -60, 40]; // Z positions for zebra crossings
-    crossingPositions.forEach(z => {
-        createZebraCrossing(z, isDark);
+    // Create zebra crossings at cardinal directions on the circular road
+    const crossingAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5]; // North, East, South, West
+    zebraCrossings = []; // Reset array
+    crossingAngles.forEach(angle => {
+        createCircularZebraCrossing(angle, roadRadius, roadWidth, isDark);
         zebraCrossings.push({
-            z: z,
-            minZ: z - 15,
-            maxZ: z + 15,
-            minX: -24,
-            maxX: 24
+            angle: angle,
+            radius: roadRadius,
+            x: Math.cos(angle) * roadRadius,
+            z: Math.sin(angle) * roadRadius,
+            roadWidth: roadWidth
         });
     });
 }
 
-function createZebraCrossing(zPos, isDark) {
-    // Create white stripes across the road
-    const stripeWidth = 6;
-    const stripeLength = 48; // Full road width
-    const numStripes = 8;
-    const spacing = 4;
+function createCircularZebraCrossing(angle, roadRadius, roadWidth, isDark) {
+    // Create white stripes across the circular road
+    const stripeWidth = 3;
+    const numStripes = 5;
+    const spacing = 2;
+    const stripeLength = roadWidth;
+
+    const centerX = Math.cos(angle) * roadRadius;
+    const centerZ = Math.sin(angle) * roadRadius;
 
     for (let i = 0; i < numStripes; i++) {
+        const offset = (i - (numStripes - 1) / 2) * (stripeWidth + spacing);
+        const x = centerX + Math.cos(angle + Math.PI / 2) * offset;
+        const z = centerZ + Math.sin(angle + Math.PI / 2) * offset;
+
         const stripeGeometry = new THREE.PlaneGeometry(stripeLength, stripeWidth);
         const stripeMaterial = new THREE.MeshStandardMaterial({
             color: 0xffffff,
@@ -601,7 +620,8 @@ function createZebraCrossing(zPos, isDark) {
         });
         const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
         stripe.rotation.x = -Math.PI / 2;
-        stripe.position.set(0, 0.03, zPos + (i - numStripes / 2) * (stripeWidth + spacing));
+        stripe.rotation.z = -angle; // Rotate to align with road direction
+        stripe.position.set(x, 0.03, z);
         stripe.receiveShadow = true;
         scene.add(stripe);
     }
@@ -748,7 +768,7 @@ function createNPC(x, z, color) {
         conversationIndex: 0,
         wantsToCross: false,
         targetCrossing: null,
-        isOnRoad: Math.abs(x) < 24 // Check if spawned on road
+        isOnRoad: false // Will be calculated based on circular road
     };
 
     scene.add(npc);
@@ -766,9 +786,19 @@ function createNPCs() {
     ];
 
     // Create NPCs for busy streets (30 NPCs - optimized for performance)
+    // Spawn them avoiding the circular road
+    const roadRadius = 100;
+    const roadWidth = 40;
+
     for (let i = 0; i < 30; i++) {
-        const x = (Math.random() - 0.5) * 240;
-        const z = -240 + Math.random() * 320;
+        let x, z, distFromCenter;
+        // Keep trying until we find a position not on the road
+        do {
+            x = (Math.random() - 0.5) * 240;
+            z = -240 + Math.random() * 320;
+            distFromCenter = Math.sqrt(x * x + z * z);
+        } while (distFromCenter > roadRadius - roadWidth / 2 && distFromCenter < roadRadius + roadWidth / 2);
+
         const color = npcColors[Math.floor(Math.random() * npcColors.length)];
         createNPC(x, z, color);
     }
@@ -840,12 +870,15 @@ function createTrafficVehicle(x, z, lane) {
     });
 
     vehicle.position.set(x, 0, z);
+    // For circular road: angle represents position on circle, speed is angular velocity
+    const angle = Math.atan2(z, x);
     vehicle.userData = {
-        lane: lane, // -1 for left lane, 1 for right lane
-        speed: 0.15 + Math.random() * 0.1, // Random speed
-        direction: lane === -1 ? Math.PI : 0 // Opposite directions
+        angle: angle, // Current angle on circular road
+        radius: Math.sqrt(x * x + z * z), // Distance from center
+        angularSpeed: (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1), // Clockwise or counter-clockwise
+        lane: lane
     };
-    vehicle.rotation.y = vehicle.userData.direction;
+    vehicle.rotation.y = -angle + Math.PI / 2; // Face tangent to circle
 
     scene.add(vehicle);
     trafficVehicles.push(vehicle);
@@ -854,28 +887,33 @@ function createTrafficVehicle(x, z, lane) {
 }
 
 function createTrafficVehicles() {
-    // Create traffic on both lanes (reduced for performance)
+    // Create traffic on both lanes of circular road (reduced for performance)
     const numVehicles = 12; // Reduced from 20 for better performance
+    const roadRadius = 100;
+    const roadWidth = 40;
 
     for (let i = 0; i < numVehicles; i++) {
-        const lane = Math.random() > 0.5 ? -1 : 1; // Left or right lane
-        const x = lane * 12; // Position in lane (left: -12, right: 12)
-        const z = -240 + Math.random() * 320; // Random position along road
+        const lane = Math.random() > 0.5 ? -1 : 1; // Inner or outer lane
+        // Inner lane (lane -1) is closer to center, outer lane (lane 1) is farther
+        const laneRadius = lane === -1 ? roadRadius - 10 : roadRadius + 10;
+
+        // Random angle around the circle
+        const angle = Math.random() * Math.PI * 2;
+        const x = Math.cos(angle) * laneRadius;
+        const z = Math.sin(angle) * laneRadius;
+
         createTrafficVehicle(x, z, lane);
     }
 }
 
 function updateTrafficVehicles() {
     trafficVehicles.forEach(vehicle => {
-        // Calculate next position
-        let nextZ = vehicle.position.z;
-        if (vehicle.userData.lane === -1) {
-            // Left lane going down (negative z)
-            nextZ -= vehicle.userData.speed;
-        } else {
-            // Right lane going up (positive z)
-            nextZ += vehicle.userData.speed;
-        }
+        // Update angle for circular movement
+        const nextAngle = vehicle.userData.angle + vehicle.userData.angularSpeed;
+
+        // Calculate next position on circular path
+        const nextX = Math.cos(nextAngle) * vehicle.userData.radius;
+        const nextZ = Math.sin(nextAngle) * vehicle.userData.radius;
 
         const vehicleRadius = 2;
         let canMove = true;
@@ -883,48 +921,54 @@ function updateTrafficVehicles() {
         // Check collision with NPCs
         for (const npc of npcs) {
             const npcRadius = 0.5;
-            if (checkCollision({ x: vehicle.position.x, z: nextZ }, vehicleRadius, npc.position, npcRadius)) {
+            if (checkCollision({ x: nextX, z: nextZ }, vehicleRadius, npc.position, npcRadius)) {
                 canMove = false;
                 // Show NPC reaction
                 showNPCReaction(npc);
                 // Slow down significantly
-                vehicle.userData.speed = Math.max(0.02, vehicle.userData.speed * 0.5);
+                vehicle.userData.angularSpeed *= 0.5;
                 break;
             }
         }
 
         // Check collision with player car
         const carRadius = 2;
-        if (canMove && checkCollision({ x: vehicle.position.x, z: nextZ }, vehicleRadius, car.position, carRadius)) {
+        if (canMove && checkCollision({ x: nextX, z: nextZ }, vehicleRadius, car.position, carRadius)) {
             canMove = false;
             // Stop or slow down significantly
-            vehicle.userData.speed = Math.max(0.01, vehicle.userData.speed * 0.3);
+            vehicle.userData.angularSpeed *= 0.3;
         }
 
         // Apply movement if no collision
         if (canMove) {
+            vehicle.userData.angle = nextAngle;
+            vehicle.position.x = nextX;
             vehicle.position.z = nextZ;
-
-            // Loop back to start when reaching end
-            if (vehicle.userData.lane === -1 && vehicle.position.z < -280) {
-                vehicle.position.z = 80;
-            } else if (vehicle.userData.lane === 1 && vehicle.position.z > 80) {
-                vehicle.position.z = -280;
-            }
+            // Update rotation to face tangent direction
+            vehicle.rotation.y = -vehicle.userData.angle + Math.PI / 2;
         }
 
         // Simple collision avoidance with other traffic
         trafficVehicles.forEach(otherVehicle => {
             if (vehicle !== otherVehicle && vehicle.userData.lane === otherVehicle.userData.lane) {
-                const distance = Math.abs(vehicle.position.z - otherVehicle.position.z);
-                if (distance < 15) {
+                // Calculate angular distance (accounting for wraparound)
+                let angleDiff = Math.abs(vehicle.userData.angle - otherVehicle.userData.angle);
+                if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+
+                // Convert to actual distance on the circular path
+                const arcDistance = angleDiff * vehicle.userData.radius;
+
+                if (arcDistance < 15) {
                     // Slow down if too close to vehicle ahead
-                    const currentSpeed = vehicle.userData.speed;
-                    vehicle.userData.speed = Math.max(0.05, currentSpeed * 0.95);
-                } else {
+                    vehicle.userData.angularSpeed *= 0.95;
+                } else if (arcDistance > 30) {
                     // Speed back up
-                    const targetSpeed = 0.15 + Math.random() * 0.1;
-                    vehicle.userData.speed = Math.min(targetSpeed, vehicle.userData.speed * 1.02);
+                    const targetAngularSpeed = (0.15 + Math.random() * 0.1) / vehicle.userData.radius;
+                    if (vehicle.userData.lane === 1) {
+                        vehicle.userData.angularSpeed = Math.max(-targetAngularSpeed, vehicle.userData.angularSpeed * 1.02);
+                    } else {
+                        vehicle.userData.angularSpeed = Math.min(targetAngularSpeed, vehicle.userData.angularSpeed * 1.02);
+                    }
                 }
             }
         });
@@ -937,15 +981,18 @@ function updateTrafficVehicles() {
 
         if (distToCar < 10) {
             // Slow down near player
-            vehicle.userData.speed *= 0.9;
+            vehicle.userData.angularSpeed *= 0.9;
         }
 
         // Slow down near zebra crossings
         for (const crossing of zebraCrossings) {
-            const distToCrossing = Math.abs(vehicle.position.z - crossing.z);
-            if (distToCrossing < 30) {
+            // Calculate angular distance to crossing
+            let angleDiff = Math.abs(vehicle.userData.angle - crossing.angle);
+            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+
+            if (angleDiff < 0.3) { // Within ~17 degrees of crossing
                 // Gradual slowdown approaching crossing
-                vehicle.userData.speed *= 0.95;
+                vehicle.userData.angularSpeed *= 0.95;
                 break;
             }
         }
@@ -971,17 +1018,23 @@ function updateNPCs() {
         if (npc.children[2]) npc.children[2].rotation.x = legSwing;
         if (npc.children[3]) npc.children[3].rotation.x = -legSwing;
 
-        // Zebra crossing logic
-        const currentlyOnRoad = Math.abs(npc.position.x) < 24;
+        // Zebra crossing logic for circular road
+        const distFromCenter = Math.sqrt(npc.position.x * npc.position.x + npc.position.z * npc.position.z);
+        const roadRadius = 100;
+        const roadWidth = 40;
+        const currentlyOnRoad = distFromCenter > roadRadius - roadWidth / 2 && distFromCenter < roadRadius + roadWidth / 2;
 
         // Randomly decide to cross the road (1% chance per frame if not already crossing)
         if (!npc.userData.wantsToCross && !currentlyOnRoad && Math.random() < 0.01) {
             npc.userData.wantsToCross = true;
-            // Find nearest zebra crossing
+            // Find nearest zebra crossing (using actual 2D distance for circular road)
             let nearestCrossing = null;
             let minDist = Infinity;
             zebraCrossings.forEach(crossing => {
-                const dist = Math.abs(crossing.z - npc.position.z);
+                const dist = Math.sqrt(
+                    Math.pow(crossing.x - npc.position.x, 2) +
+                    Math.pow(crossing.z - npc.position.z, 2)
+                );
                 if (dist < minDist) {
                     minDist = dist;
                     nearestCrossing = crossing;
@@ -990,21 +1043,24 @@ function updateNPCs() {
             npc.userData.targetCrossing = nearestCrossing;
         }
 
-        // Navigate to zebra crossing if wanting to cross
+        // Navigate to zebra crossing if wanting to cross (circular road)
         if (npc.userData.wantsToCross && npc.userData.targetCrossing && !currentlyOnRoad) {
             const crossing = npc.userData.targetCrossing;
-            const distToXing = Math.abs(crossing.z - npc.position.z);
+            const distToXing = Math.sqrt(
+                Math.pow(crossing.x - npc.position.x, 2) +
+                Math.pow(crossing.z - npc.position.z, 2)
+            );
 
-            // If close to crossing, face towards it and approach
-            if (distToXing > 5) {
-                // Navigate to crossing
-                const angleToXing = Math.atan2(0, crossing.z - npc.position.z);
+            // If far from crossing, navigate towards it
+            if (distToXing > 10) {
+                const angleToXing = Math.atan2(crossing.x - npc.position.x, crossing.z - npc.position.z);
                 npc.userData.direction = angleToXing;
             } else {
-                // At crossing, now cross the road
-                const targetX = npc.position.x < 0 ? 30 : -30; // Cross to other side
-                const angleToOtherSide = Math.atan2(targetX - npc.position.x, 0);
-                npc.userData.direction = angleToOtherSide;
+                // At crossing, cross radially (either inward or outward)
+                const crossInward = distFromCenter > roadRadius;
+                const targetRadius = crossInward ? roadRadius - roadWidth : roadRadius + roadWidth;
+                const angleToCenter = Math.atan2(-npc.position.x, -npc.position.z);
+                npc.userData.direction = crossInward ? angleToCenter : angleToCenter + Math.PI;
             }
         }
 
@@ -1026,18 +1082,31 @@ function updateNPCs() {
 
         let canMove = true;
 
+        // Prevent NPCs from entering circular road unless at zebra crossing
+        const newDistFromCenter = Math.sqrt(newX * newX + newZ * newZ);
+        const willBeOnRoad = newDistFromCenter > roadRadius - roadWidth / 2 && newDistFromCenter < roadRadius + roadWidth / 2;
+        if (!npc.userData.wantsToCross && willBeOnRoad && !currentlyOnRoad) {
+            // Trying to enter road without permission - stop them
+            canMove = false;
+            // Turn away from road - turn perpendicular to radial direction
+            const angleToCenter = Math.atan2(-npc.position.z, -npc.position.x);
+            npc.userData.direction = angleToCenter + Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 4;
+        }
+
         // Check collision with static objects (trees, rocks, benches, etc.)
-        for (const obj of staticObjects) {
-            const objRadius = obj.userData.radius || 2;
-            if (checkCollision({ x: newX, z: newZ }, npcRadius, obj.position, objRadius)) {
-                canMove = false;
-                // Turn away from obstacle
-                const angleToObj = Math.atan2(
-                    npc.position.x - obj.position.x,
-                    npc.position.z - obj.position.z
-                );
-                npc.userData.direction = angleToObj + (Math.random() - 0.5) * Math.PI / 2;
-                break;
+        if (canMove) {
+            for (const obj of staticObjects) {
+                const objRadius = obj.userData.radius || 2;
+                if (checkCollision({ x: newX, z: newZ }, npcRadius, obj.position, objRadius)) {
+                    canMove = false;
+                    // Turn away from obstacle
+                    const angleToObj = Math.atan2(
+                        npc.position.x - obj.position.x,
+                        npc.position.z - obj.position.z
+                    );
+                    npc.userData.direction = angleToObj + (Math.random() - 0.5) * Math.PI / 2;
+                    break;
+                }
             }
         }
 
@@ -1489,7 +1558,7 @@ function createTechFlowerGarden() {
 function createContactLilyPond() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Create lily pond (4x scale)
+    // Create lily pond (4x scale) - moved off the road
     const pondGeometry = new THREE.CircleGeometry(40, 32);
     const pondMaterial = new THREE.MeshStandardMaterial({
         color: isDark ? 0x1a3d5c : 0x5dade2,
@@ -1500,20 +1569,20 @@ function createContactLilyPond() {
     });
     const pond = new THREE.Mesh(pondGeometry, pondMaterial);
     pond.rotation.x = -Math.PI / 2;
-    pond.position.set(0, 0.02, -220);
+    pond.position.set(80, 0.02, -220); // Moved to x=80 to avoid road
     pond.receiveShadow = true;
     scene.add(pond);
 
-    // Title sign (4x scale)
+    // Title sign (4x scale) - moved with pond
     const titleBoard = createTextBoard('WELCOME & CONTACT', 48, 12, '#5a3d54', '#ffffff', true);
-    titleBoard.position.set(0, 12, -160);
+    titleBoard.position.set(80, 12, -160);
     scene.add(titleBoard);
 
-    // Support post (4x scale)
+    // Support post (4x scale) - moved with pond
     const postGeometry = new THREE.CylinderGeometry(0.8, 0.8, 12, 8);
     const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
     const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(0, 6, -160);
+    post.position.set(80, 6, -160);
     post.castShadow = true;
     scene.add(post);
 
@@ -1743,11 +1812,12 @@ function createCar() {
 function createEnvironment() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Trees scattered around the edges (4x scale)
+    // Trees scattered around the edges (4x scale) - removed from road
     const treePositions = [
         { x: -140, z: 40 }, { x: -140, z: -40 }, { x: -140, z: -120 }, { x: -140, z: -200 },
         { x: 140, z: 40 }, { x: 140, z: -40 }, { x: 140, z: -120 }, { x: 140, z: -200 },
-        { x: -40, z: 72 }, { x: 40, z: 72 }, { x: 0, z: -280 },
+        { x: -40, z: 72 }, { x: 40, z: 72 },
+        // Tree at (0, -280) removed as it was on the road
         // Add more trees for better boundaries
         { x: -72, z: -140 }, { x: 72, z: -140 }
     ];
@@ -1982,9 +2052,13 @@ function updateCar() {
     // Update engine sound based on speed
     updateEngineSound(carSpeed);
 
-    // Slow down near zebra crossings
+    // Slow down near zebra crossings (circular road)
     for (const crossing of zebraCrossings) {
-        const distToCrossing = Math.abs(car.position.z - crossing.z);
+        // Calculate distance to crossing using x,z coordinates
+        const distToCrossing = Math.sqrt(
+            Math.pow(car.position.x - crossing.x, 2) +
+            Math.pow(car.position.z - crossing.z, 2)
+        );
         if (distToCrossing < 30) {
             // Gradual slowdown approaching crossing
             carSpeed *= 0.92;
