@@ -540,10 +540,10 @@ function createUrbanGround(isDark) {
 function createRoadMarkings() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // Create circular road around the city
-    const roadRadius = 100; // Radius of the circular road
+    // Create circular road OUTSIDE the city - encompasses all CV content
+    const roadRadius = 250; // Large radius to surround all resume elements
     const roadWidth = 40; // Width of the road
-    const segments = 64;
+    const segments = 128; // More segments for smoother large circle
 
     // Create road using RingGeometry for a circular road
     const roadGeometry = new THREE.RingGeometry(roadRadius - roadWidth / 2, roadRadius + roadWidth / 2, segments);
@@ -791,13 +791,13 @@ function createNPCs() {
     ];
 
     // Create NPCs for busy streets (30 NPCs) - Spawn in designated pedestrian zones
-    // Define safe pedestrian zones (avoiding road radius 80-120)
+    // All zones are INSIDE the circular road (radius 250, inner edge 230)
     const pedestrianZones = [
         { name: 'North Park', xMin: -80, xMax: 80, zMin: 140, zMax: 200 },          // North park
         { name: 'East Skills', xMin: 130, xMax: 180, zMin: -80, zMax: 80 },         // East skills area
         { name: 'West Career', xMin: -180, xMax: -130, zMin: -80, zMax: 80 },       // West career area
         { name: 'South Contact', xMin: -60, xMax: 60, zMin: -220, zMax: -140 },     // South contact area
-        { name: 'Inner Circle', xMin: -60, xMax: 60, zMin: -60, zMax: 60 }          // Inner circle (inside road)
+        { name: 'Inner Circle', xMin: -60, xMax: 60, zMin: -60, zMax: 60 }          // Central area
     ];
 
     // Distribute NPCs across zones (6 per zone)
@@ -899,7 +899,7 @@ function createTrafficVehicle(x, z, lane) {
 function createTrafficVehicles() {
     // Create traffic on both lanes of circular road (reduced for performance)
     const numVehicles = 12; // Reduced from 20 for better performance
-    const roadRadius = 100;
+    const roadRadius = 250; // Updated to match enlarged road
     const roadWidth = 40;
 
     for (let i = 0; i < numVehicles; i++) {
@@ -1094,9 +1094,9 @@ function updateNPCs() {
         if (npc.children[2]) npc.children[2].rotation.x = legSwing;
         if (npc.children[3]) npc.children[3].rotation.x = -legSwing;
 
-        // Zebra crossing logic for circular road
+        // Zebra crossing logic for circular road (enlarged to encompass city)
         const distFromCenter = Math.sqrt(npc.position.x * npc.position.x + npc.position.z * npc.position.z);
-        const roadRadius = 100;
+        const roadRadius = 250; // Updated to match enlarged road
         const roadWidth = 40;
         const currentlyOnRoad = distFromCenter > roadRadius - roadWidth / 2 && distFromCenter < roadRadius + roadWidth / 2;
 
