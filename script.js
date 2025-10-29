@@ -38,6 +38,8 @@ let billboards = [];
 // NPCs and Traffic
 let npcs = [];
 let trafficVehicles = [];
+let zebraCrossings = []; // Store zebra crossing positions
+let activeBubbles = []; // Track active NPC reaction bubbles for position updates
 
 // NPC Conversations
 const npcConversations = [
@@ -339,35 +341,54 @@ function showNPCReaction(npc) {
 
     npc.userData.recentlyHit = true;
 
-    // Get screen position of NPC
-    const vector = new THREE.Vector3();
-    npc.getWorldPosition(vector);
-    vector.y += 2.5; // Position above NPC head
-    vector.project(camera);
-
-    const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
-    const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
-
     // Create bubble element
     const bubble = document.createElement('div');
     bubble.className = 'conversation-bubble npc-reaction';
-    bubble.style.left = screenX + 'px';
-    bubble.style.top = screenY + 'px';
     bubble.textContent = "Hey, watch where you're going!";
     bubble.setAttribute('data-npc-id', npc.uuid);
-
     document.body.appendChild(bubble);
+
+    // Track bubble for position updates
+    const bubbleData = {
+        element: bubble,
+        npc: npc,
+        createdAt: Date.now()
+    };
+    activeBubbles.push(bubbleData);
 
     // Remove bubble after 2 seconds
     setTimeout(() => {
         bubble.classList.add('fade-out');
-        setTimeout(() => bubble.remove(), 300);
+        setTimeout(() => {
+            bubble.remove();
+            // Remove from active bubbles array
+            const index = activeBubbles.indexOf(bubbleData);
+            if (index > -1) {
+                activeBubbles.splice(index, 1);
+            }
+        }, 300);
     }, 2000);
 
     // Reset reaction cooldown after 5 seconds
     setTimeout(() => {
         npc.userData.recentlyHit = false;
     }, 5000);
+}
+
+function updateBubblePositions() {
+    // Update positions of all active reaction bubbles to follow NPCs
+    activeBubbles.forEach(bubbleData => {
+        const vector = new THREE.Vector3();
+        bubbleData.npc.getWorldPosition(vector);
+        vector.y += 2.5; // Position above NPC head
+        vector.project(camera);
+
+        const screenX = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const screenY = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+
+        bubbleData.element.style.left = screenX + 'px';
+        bubbleData.element.style.top = screenY + 'px';
+    });
 }
 
 function removeConversationBubbles(npcId) {
@@ -547,6 +568,43 @@ function createRoadMarkings() {
         line.position.set(0, 0.02, z);
         scene.add(line);
     }
+
+    // Create zebra crossings at strategic locations
+    const crossingPositions = [-200, -60, 40]; // Z positions for zebra crossings
+    crossingPositions.forEach(z => {
+        createZebraCrossing(z, isDark);
+        zebraCrossings.push({
+            z: z,
+            minZ: z - 15,
+            maxZ: z + 15,
+            minX: -24,
+            maxX: 24
+        });
+    });
+}
+
+function createZebraCrossing(zPos, isDark) {
+    // Create white stripes across the road
+    const stripeWidth = 6;
+    const stripeLength = 48; // Full road width
+    const numStripes = 8;
+    const spacing = 4;
+
+    for (let i = 0; i < numStripes; i++) {
+        const stripeGeometry = new THREE.PlaneGeometry(stripeLength, stripeWidth);
+        const stripeMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.8,
+            metalness: 0.1,
+            emissive: isDark ? 0xffffff : 0x000000,
+            emissiveIntensity: isDark ? 0.1 : 0
+        });
+        const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+        stripe.rotation.x = -Math.PI / 2;
+        stripe.position.set(0, 0.03, zPos + (i - numStripes / 2) * (stripeWidth + spacing));
+        stripe.receiveShadow = true;
+        scene.add(stripe);
+    }
 }
 
 function createSidewalks(isDark) {
@@ -687,7 +745,10 @@ function createNPC(x, z, color) {
         proximityTime: 0,
         isTalking: false,
         hasSpoken: false,
-        conversationIndex: 0
+        conversationIndex: 0,
+        wantsToCross: false,
+        targetCrossing: null,
+        isOnRoad: Math.abs(x) < 24 // Check if spawned on road
     };
 
     scene.add(npc);
@@ -878,6 +939,16 @@ function updateTrafficVehicles() {
             // Slow down near player
             vehicle.userData.speed *= 0.9;
         }
+
+        // Slow down near zebra crossings
+        for (const crossing of zebraCrossings) {
+            const distToCrossing = Math.abs(vehicle.position.z - crossing.z);
+            if (distToCrossing < 30) {
+                // Gradual slowdown approaching crossing
+                vehicle.userData.speed *= 0.95;
+                break;
+            }
+        }
     });
 }
 
@@ -899,6 +970,54 @@ function updateNPCs() {
         const legSwing = Math.sin(npc.userData.walkTime * 10) * 0.3;
         if (npc.children[2]) npc.children[2].rotation.x = legSwing;
         if (npc.children[3]) npc.children[3].rotation.x = -legSwing;
+
+        // Zebra crossing logic
+        const currentlyOnRoad = Math.abs(npc.position.x) < 24;
+
+        // Randomly decide to cross the road (1% chance per frame if not already crossing)
+        if (!npc.userData.wantsToCross && !currentlyOnRoad && Math.random() < 0.01) {
+            npc.userData.wantsToCross = true;
+            // Find nearest zebra crossing
+            let nearestCrossing = null;
+            let minDist = Infinity;
+            zebraCrossings.forEach(crossing => {
+                const dist = Math.abs(crossing.z - npc.position.z);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestCrossing = crossing;
+                }
+            });
+            npc.userData.targetCrossing = nearestCrossing;
+        }
+
+        // Navigate to zebra crossing if wanting to cross
+        if (npc.userData.wantsToCross && npc.userData.targetCrossing && !currentlyOnRoad) {
+            const crossing = npc.userData.targetCrossing;
+            const distToXing = Math.abs(crossing.z - npc.position.z);
+
+            // If close to crossing, face towards it and approach
+            if (distToXing > 5) {
+                // Navigate to crossing
+                const angleToXing = Math.atan2(0, crossing.z - npc.position.z);
+                npc.userData.direction = angleToXing;
+            } else {
+                // At crossing, now cross the road
+                const targetX = npc.position.x < 0 ? 30 : -30; // Cross to other side
+                const angleToOtherSide = Math.atan2(targetX - npc.position.x, 0);
+                npc.userData.direction = angleToOtherSide;
+            }
+        }
+
+        // Check if finished crossing
+        if (npc.userData.wantsToCross && currentlyOnRoad !== npc.userData.isOnRoad) {
+            if (!currentlyOnRoad && npc.userData.isOnRoad) {
+                // Just finished crossing
+                npc.userData.wantsToCross = false;
+                npc.userData.targetCrossing = null;
+                npc.userData.direction = Math.random() * Math.PI * 2; // Random direction after crossing
+            }
+        }
+        npc.userData.isOnRoad = currentlyOnRoad;
 
         // Calculate next position
         const newX = npc.position.x + Math.sin(npc.userData.direction) * npc.userData.speed;
@@ -1863,6 +1982,16 @@ function updateCar() {
     // Update engine sound based on speed
     updateEngineSound(carSpeed);
 
+    // Slow down near zebra crossings
+    for (const crossing of zebraCrossings) {
+        const distToCrossing = Math.abs(car.position.z - crossing.z);
+        if (distToCrossing < 30) {
+            // Gradual slowdown approaching crossing
+            carSpeed *= 0.92;
+            break;
+        }
+    }
+
     // Calculate new position
     const newX = car.position.x + Math.sin(carRotation) * carSpeed;
     const newZ = car.position.z + Math.cos(carRotation) * carSpeed;
@@ -2177,6 +2306,9 @@ function animate() {
             }
         }
     });
+
+    // Update bubble positions to follow NPCs
+    updateBubblePositions();
 
     renderer.render(scene, camera);
 }
