@@ -1775,10 +1775,10 @@ function updateHospitalAdmitBoard() {
 	if (count !== lastAdmitCount) {
 		const canvas = hospitalAdmitBoard.material.map.image;
 		const ctx = canvas.getContext('2d');
-		ctx.fillStyle = '#2d2d2d';
+		ctx.fillStyle = '#ff0000';
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 		ctx.fillStyle = '#ffffff';
-		ctx.font = 'bold 48px Arial';
+		ctx.font = 'bold 80px Arial';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
 		ctx.fillText(`ADMITTED: ${count}`, canvas.width / 2, canvas.height / 2);
@@ -2899,9 +2899,9 @@ function createHospital(isDark) {
 	scene.add(hospitalGroup);
 	hospital = hospitalGroup;
 
-	// Admit count board
-	hospitalAdmitBoard = createTextBoard('ADMITTED: 0', 24, 8, '#ffffff', '#2d2d2d', true);
-	hospitalAdmitBoard.position.set(hospitalPosition.x, 10, hospitalPosition.z + 14);
+	// Admit count board - large and prominent
+	hospitalAdmitBoard = createTextBoard('ADMITTED: 0', 48, 16, '#ffffff', '#ff0000', true);
+	hospitalAdmitBoard.position.set(hospitalPosition.x, 18, hospitalPosition.z + 14);
 	hospitalAdmitBoard.rotation.y = 0;
 	scene.add(hospitalAdmitBoard);
 }
