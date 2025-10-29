@@ -1218,29 +1218,43 @@ function updateTrafficVehicles() {
 
             // Reset stuck counter when moving
             vehicle.userData.stuckFrames = 0;
+            vehicle.userData.lastMovedTime = performance.now();
         } else {
             // Vehicle is blocked - track how long it's been stuck
             vehicle.userData.stuckFrames = (vehicle.userData.stuckFrames || 0) + 1;
 
-            // Quick evasive maneuver: try adjusting radius slightly to navigate around obstacle
-            if (vehicle.userData.stuckFrames > 10 && vehicle.userData.stuckFrames < 60) {
-                // Try shifting inward or outward slightly every few frames
-                if (vehicle.userData.stuckFrames % 15 === 0) {
-                    const radiusAdjustment = (Math.random() - 0.5) * 4; // ±2 units
+            // IMMEDIATE ACTION: Try radius adjustment every 5 frames (not 15)
+            if (vehicle.userData.stuckFrames > 5) {
+                if (vehicle.userData.stuckFrames % 5 === 0) {
+                    // Larger radius adjustment to escape faster
+                    const radiusAdjustment = (Math.random() - 0.5) * 8; // ±4 units (doubled)
                     vehicle.userData.radius += radiusAdjustment;
 
-                    // Recalculate position with new radius
+                    // Also try angular shift to break side-by-side deadlocks
+                    const angleShift = (Math.random() - 0.5) * 0.15; // ±0.075 radians
+                    vehicle.userData.angle += angleShift;
+
+                    // Recalculate position
                     vehicle.position.x = Math.cos(vehicle.userData.angle) * vehicle.userData.radius;
                     vehicle.position.z = Math.sin(vehicle.userData.angle) * vehicle.userData.radius;
                 }
             }
 
-            // If stuck for longer, try reversing briefly to get unstuck
-            if (vehicle.userData.stuckFrames > 60 && vehicle.userData.stuckFrames < 90) {
-                // Reverse angular direction temporarily
-                vehicle.userData.angle -= vehicle.userData.angularSpeed * 2;
+            // If stuck for 30 frames (0.5 seconds), try aggressive reverse
+            if (vehicle.userData.stuckFrames > 30 && vehicle.userData.stuckFrames < 60) {
+                // Reverse angular direction more aggressively
+                vehicle.userData.angle -= vehicle.userData.angularSpeed * 3;
                 vehicle.position.x = Math.cos(vehicle.userData.angle) * vehicle.userData.radius;
                 vehicle.position.z = Math.sin(vehicle.userData.angle) * vehicle.userData.radius;
+            }
+
+            // If STILL stuck after 60 frames, teleport slightly forward
+            if (vehicle.userData.stuckFrames === 60) {
+                // Emergency teleport: jump forward by 10 units
+                vehicle.userData.angle += Math.abs(vehicle.userData.angularSpeed) * 20;
+                vehicle.position.x = Math.cos(vehicle.userData.angle) * vehicle.userData.radius;
+                vehicle.position.z = Math.sin(vehicle.userData.angle) * vehicle.userData.radius;
+                vehicle.userData.stuckFrames = 0; // Reset
             }
         }
 
@@ -1280,8 +1294,13 @@ function updateTrafficVehicles() {
             vehicle.userData.stuckTime = 0;
         }
 
-        // Attempt lane change if stuck for a while and cooldown expired (reduced threshold for faster response)
-        if ((vehicle.userData.stuckTime || 0) > 40 && (!vehicle.userData.laneChangeCooldown || vehicle.userData.laneChangeCooldown <= 0)) {
+        // Attempt lane change if stuck for a while and cooldown expired (very aggressive)
+        // Check BOTH stuckTime (from traffic following) AND stuckFrames (from collision blocking)
+        const isStuckFromTraffic = (vehicle.userData.stuckTime || 0) > 20; // Reduced from 40
+        const isStuckFromCollision = (vehicle.userData.stuckFrames || 0) > 25;
+        const canChangeLane = !vehicle.userData.laneChangeCooldown || vehicle.userData.laneChangeCooldown <= 0;
+
+        if ((isStuckFromTraffic || isStuckFromCollision) && canChangeLane) {
             // Determine road params from crossings (fallback to defaults)
             const rr = zebraCrossings[0] ? zebraCrossings[0].radius : 350;
             const rw = zebraCrossings[0] ? zebraCrossings[0].roadWidth : 40;
@@ -1314,9 +1333,12 @@ function updateTrafficVehicles() {
             if (safeToChange) {
                 vehicle.userData.lane = newLane;
                 vehicle.userData.targetRadius = candidateRadius;
-                vehicle.userData.laneChangeCooldown = 180; // ~3 seconds (reduced for more responsive traffic)
+                vehicle.userData.laneChangeCooldown = 90; // ~1.5 seconds (very aggressive)
                 vehicle.userData.stuckTime = 0;
                 vehicle.userData.stuckFrames = 0; // Reset immediate stuck counter too
+            } else {
+                // If lane change failed, still reset cooldown but shorter to retry soon
+                vehicle.userData.laneChangeCooldown = 30; // Only 0.5 second retry
             }
         }
 
