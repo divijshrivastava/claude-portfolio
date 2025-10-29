@@ -668,16 +668,17 @@ function createCityBuildings(isDark) {
     const windowColor = isDark ? 0x00d4ff : 0x6b2bff; // Cyan / purple windows
 
     // Building positions scaled 4x
-    // Buildings repositioned to frame the circular road - Downtown Business District
+    // Buildings - MOVED OFF CARDINAL AXES for CV/resume visibility (heights reduced)
+    // PRIMARY GOAL: Don't block Career Mountains, Skills, or Contact Area!
     const buildingPositions = [
-        { x: 0, z: -150, w: 50, h: 30, d: 40 }, // North Building - Company HQ
-        { x: 0, z: 50, w: 50, h: 35, d: 40 }, // South Building - Tech Center
-        { x: 150, z: 0, w: 40, h: 32, d: 50 }, // East Building - Innovation Hub
-        { x: -150, z: 0, w: 40, h: 28, d: 50 }, // West Building - Development Center
-        { x: 120, z: -120, w: 45, h: 26, d: 45 }, // NE Building
-        { x: 120, z: 60, w: 45, h: 30, d: 45 }, // SE Building
-        { x: -120, z: -120, w: 45, h: 24, d: 45 }, // NW Building
-        { x: -120, z: 60, w: 45, h: 28, d: 45 } // SW Building
+        { x: -35, z: -170, w: 50, h: 20, d: 40 }, // North Building - OFF axis, shorter
+        { x: 35, z: 70, w: 50, h: 22, d: 40 }, // South Building - OFF axis, shorter
+        { x: 170, z: -20, w: 40, h: 22, d: 50 }, // East Building - Pushed back, shorter
+        { x: -170, z: 20, w: 40, h: 18, d: 50 }, // West Building - Pushed back, shorter
+        { x: 120, z: -120, w: 45, h: 20, d: 45 }, // NE Building - reduced height
+        { x: 120, z: 110, w: 45, h: 22, d: 45 }, // SE Building - moved north, reduced height
+        { x: -120, z: -120, w: 45, h: 18, d: 45 }, // NW Building - reduced height
+        { x: -120, z: 110, w: 45, h: 20, d: 45 } // SW Building - moved north, reduced height
     ];
 
     buildingPositions.forEach(building => {
@@ -1331,27 +1332,27 @@ function createSkillBuckets() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     // Create puddles with skill buckets (4x scale) - cyberpunk colors
-    // Skill Stations - Eastern district, organized vertically
+    // Skill Stations - PROMINENT VISIBILITY - Moved closer for CV showcase
     const skillGroups = [
         {
             title: 'BACKEND DEVELOPMENT',
             skills: ['Java 8', 'Spring Boot', 'Spring MVC', 'Gradle'],
-            x: 160,
-            z: 60,
+            x: 145,
+            z: 70,
             color: 0x00d4ff // Electric cyan
         },
         {
             title: 'DATA LAYER',
             skills: ['MySQL', 'MongoDB', 'PostgreSQL', 'Redis'],
-            x: 160,
+            x: 145,
             z: 0,
             color: 0x00ff88 // Neon green
         },
         {
             title: 'APIs & ARCHITECTURE',
             skills: ['REST APIs', 'GraphQL', 'Microservices', 'Cloud'],
-            x: 160,
-            z: -60,
+            x: 145,
+            z: -70,
             color: 0xff2e97 // Hot pink
         }
     ];
@@ -1437,13 +1438,13 @@ function createCareerSteppingStones() {
     });
     const stream = new THREE.Mesh(streamGeometry, streamMaterial);
     stream.rotation.x = -Math.PI / 2;
-    stream.position.set(-150, 0.02, 0); // Centered with new mountain positions
+    stream.position.set(-145, 0.02, 0); // Aligned with career mountains
     stream.receiveShadow = true;
     scene.add(stream);
 
     // Title sign (4x scale)
     const titleBoard = createTextBoard('CAREER JOURNEY', 40, 10, '#8b5a9e', '#ffffff', true);
-    titleBoard.position.set(-150, 12, 80); // Above stream
+    titleBoard.position.set(-145, 12, 90); // Above stream, visible
     scene.add(titleBoard);
 
     // Support post (4x scale)
@@ -1455,11 +1456,11 @@ function createCareerSteppingStones() {
     scene.add(post);
 
     // Job milestones as rideable mountains/hills (4x scale)
-    // Career mountains - Western district, evenly spaced along career progression
+    // Career mountains - PROMINENT VISIBILITY - Moved closer for CV showcase
     const jobs = [
-        { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', x: -160, z: 60 },
-        { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', x: -160, z: 0 },
-        { company: 'TCS', role: 'Systems Engineer', years: '2017-2019', x: -160, z: -60 }
+        { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', x: -145, z: 70 },
+        { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', x: -145, z: 0 },
+        { company: 'TCS', role: 'Systems Engineer', years: '2017-2019', x: -145, z: -70 }
     ];
 
     jobs.forEach((job, index) => {
