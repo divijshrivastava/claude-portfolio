@@ -46,6 +46,13 @@ let policeStationPosition = { x: -300, z: 260 };
 let policeArrestBoard;
 let lastArrestCount = -1;
 
+let hospital;
+let hospitalPosition = { x: 300, z: -260 }; // Opposite side of police station
+let hospitalAdmitBoard;
+let lastAdmitCount = -1;
+let ambulances = [];
+let hospitalizedVehicles = [];
+
 // NPC Conversations
 const npcConversations = [
     ["Hey there!", "Nice ride you got!", "Have a great day!"],
@@ -1186,12 +1193,29 @@ function updateTrafficVehicles() {
         // Check collision with other traffic vehicles
         if (canMove) {
             for (const otherVehicle of trafficVehicles) {
-                if (vehicle !== otherVehicle) {
+                if (vehicle !== otherVehicle && !vehicle.userData.hospitalized && !otherVehicle.userData.hospitalized) {
                     const otherVehicleRadius = 2;
                     if (checkCollision({ x: nextX, z: nextZ }, vehicleRadius, otherVehicle.position, otherVehicleRadius)) {
                         canMove = false;
-                        // Bounce back slightly
-                        vehicle.userData.angularSpeed *= 0.4;
+
+                        // Detect head-on collision: vehicles in opposite lanes moving at speed
+                        const isHeadOn = vehicle.userData.lane !== otherVehicle.userData.lane;
+                        const vehicle1Speed = Math.abs(vehicle.userData.angularSpeed * vehicle.userData.radius);
+                        const vehicle2Speed = Math.abs(otherVehicle.userData.angularSpeed * otherVehicle.userData.radius);
+                        const combinedSpeed = vehicle1Speed + vehicle2Speed;
+
+                        // Head-on collision if opposite lanes and high combined speed
+                        if (isHeadOn && combinedSpeed > 0.3 && !vehicle.userData.crashProcessed && !otherVehicle.userData.crashProcessed) {
+                            // Mark both as crashed to prevent duplicate ambulance calls
+                            vehicle.userData.crashProcessed = true;
+                            otherVehicle.userData.crashProcessed = true;
+
+                            // Spawn ambulance for this crash
+                            spawnAmbulance(vehicle, otherVehicle);
+                        } else {
+                            // Normal collision - bounce back slightly
+                            vehicle.userData.angularSpeed *= 0.4;
+                        }
                         break;
                     }
                 }
@@ -1576,6 +1600,235 @@ function updatePoliceVehicles() {
 
 		// Update arrest count display per frame
 		updatePoliceArrestBoard();
+	});
+}
+
+function spawnAmbulance(vehicle1, vehicle2) {
+	const ambulance = new THREE.Group();
+
+	// Ambulance body - white with red stripe
+	const body = new THREE.Mesh(
+		new THREE.BoxGeometry(2.2, 1.2, 4.5),
+		new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.6 })
+	);
+	body.position.y = 0.9;
+	ambulance.add(body);
+
+	// Red stripe
+	const stripe = new THREE.Mesh(
+		new THREE.BoxGeometry(2.3, 0.3, 4.6),
+		new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.5 })
+	);
+	stripe.position.set(0, 1.1, 0);
+	ambulance.add(stripe);
+
+	// Light bar
+	const bar = new THREE.Mesh(
+		new THREE.BoxGeometry(1.6, 0.25, 0.8),
+		new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 })
+	);
+	bar.position.set(0, 1.5, 0);
+	ambulance.add(bar);
+
+	// Siren lights (red cross pattern)
+	const redSiren1 = new THREE.Mesh(
+		new THREE.SphereGeometry(0.22, 8, 8),
+		new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2.0 })
+	);
+	redSiren1.position.set(-0.4, 1.6, 0);
+	ambulance.add(redSiren1);
+
+	const redSiren2 = new THREE.Mesh(
+		new THREE.SphereGeometry(0.22, 8, 8),
+		new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.2 })
+	);
+	redSiren2.position.set(0.4, 1.6, 0);
+	ambulance.add(redSiren2);
+
+	// Start at hospital
+	ambulance.position.set(hospitalPosition.x, 0, hospitalPosition.z);
+	scene.add(ambulance);
+
+	// Calculate crash site (midpoint between the two vehicles)
+	const crashX = (vehicle1.position.x + vehicle2.position.x) / 2;
+	const crashZ = (vehicle1.position.z + vehicle2.position.z) / 2;
+
+	ambulance.userData = {
+		state: 'responding', // responding -> loading -> transporting -> parked
+		speed: 0.7,
+		vehicles: [vehicle1, vehicle2],
+		crashSite: { x: crashX, z: crashZ },
+		redSiren1: redSiren1,
+		redSiren2: redSiren2,
+		phase: 0
+	};
+
+	// Mark vehicles as hospitalized
+	vehicle1.userData.hospitalized = true;
+	vehicle1.userData.angularSpeed = 0; // Stop moving
+	vehicle2.userData.hospitalized = true;
+	vehicle2.userData.angularSpeed = 0; // Stop moving
+
+	ambulances.push(ambulance);
+}
+
+function updateAmbulances() {
+	ambulances.forEach(ambulance => {
+		// Flash sirens
+		ambulance.userData.phase += 0.15;
+		const rOn = (Math.sin(ambulance.userData.phase) > 0);
+		ambulance.userData.redSiren1.material.emissiveIntensity = rOn ? 2.0 : 0.2;
+		ambulance.userData.redSiren2.material.emissiveIntensity = rOn ? 0.2 : 2.0;
+
+		if (ambulance.userData.state === 'responding') {
+			// Move to crash site
+			const targetX = ambulance.userData.crashSite.x;
+			const targetZ = ambulance.userData.crashSite.z;
+			const dx = targetX - ambulance.position.x;
+			const dz = targetZ - ambulance.position.z;
+			const dist = Math.hypot(dx, dz);
+
+			if (dist > 2) {
+				const dirX = dx / dist;
+				const dirZ = dz / dist;
+				ambulance.position.x += dirX * ambulance.userData.speed;
+				ambulance.position.z += dirZ * ambulance.userData.speed;
+				ambulance.rotation.y = Math.atan2(dirX, dirZ);
+			} else {
+				// Arrived at crash site - start loading
+				ambulance.userData.state = 'loading';
+				ambulance.userData.loadingTimer = 120; // 2 seconds to load
+			}
+		} else if (ambulance.userData.state === 'loading') {
+			// Wait for loading
+			ambulance.userData.loadingTimer--;
+			if (ambulance.userData.loadingTimer <= 0) {
+				ambulance.userData.state = 'transporting';
+			}
+		} else if (ambulance.userData.state === 'transporting') {
+			// Transport vehicles to hospital
+			const targetX = hospitalPosition.x;
+			const targetZ = hospitalPosition.z - 10;
+			const dx = targetX - ambulance.position.x;
+			const dz = targetZ - ambulance.position.z;
+			const dist = Math.hypot(dx, dz);
+
+			if (dist > 1) {
+				const dirX = dx / dist;
+				const dirZ = dz / dist;
+				ambulance.position.x += dirX * (ambulance.userData.speed * 0.8);
+				ambulance.position.z += dirZ * (ambulance.userData.speed * 0.8);
+				ambulance.rotation.y = Math.atan2(dirX, dirZ);
+
+				// Tow both vehicles behind ambulance
+				const vehicle1 = ambulance.userData.vehicles[0];
+				const vehicle2 = ambulance.userData.vehicles[1];
+				if (vehicle1) {
+					vehicle1.position.x = ambulance.position.x - Math.sin(ambulance.rotation.y) * 4;
+					vehicle1.position.z = ambulance.position.z - Math.cos(ambulance.rotation.y) * 4;
+					vehicle1.rotation.y = ambulance.rotation.y;
+				}
+				if (vehicle2) {
+					vehicle2.position.x = ambulance.position.x - Math.sin(ambulance.rotation.y) * 7;
+					vehicle2.position.z = ambulance.position.z - Math.cos(ambulance.rotation.y) * 7;
+					vehicle2.rotation.y = ambulance.rotation.y;
+				}
+			} else {
+				// Arrived at hospital
+				ambulance.userData.state = 'parked';
+
+				// Park vehicles at hospital
+				const vehicle1 = ambulance.userData.vehicles[0];
+				const vehicle2 = ambulance.userData.vehicles[1];
+
+				if (vehicle1) {
+					vehicle1.position.set(hospitalPosition.x - 6, 0, hospitalPosition.z - 10);
+					vehicle1.rotation.y = 0;
+					hospitalizedVehicles.push({
+						vehicle: vehicle1,
+						releaseAt: performance.now() + 60000 // 1 minute
+					});
+				}
+				if (vehicle2) {
+					vehicle2.position.set(hospitalPosition.x + 6, 0, hospitalPosition.z - 10);
+					vehicle2.rotation.y = 0;
+					hospitalizedVehicles.push({
+						vehicle: vehicle2,
+						releaseAt: performance.now() + 60000 // 1 minute
+					});
+				}
+
+				// Despawn ambulance after delivery
+				scene.remove(ambulance);
+				ambulances = ambulances.filter(a => a !== ambulance);
+			}
+		}
+
+		// Update admit count display
+		updateHospitalAdmitBoard();
+	});
+}
+
+function updateHospitalAdmitBoard() {
+	if (!hospitalAdmitBoard) return;
+	const count = hospitalizedVehicles.length;
+	if (count !== lastAdmitCount) {
+		const canvas = hospitalAdmitBoard.material.map.image;
+		const ctx = canvas.getContext('2d');
+		ctx.fillStyle = '#2d2d2d';
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.fillStyle = '#ffffff';
+		ctx.font = 'bold 48px Arial';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillText(`ADMITTED: ${count}`, canvas.width / 2, canvas.height / 2);
+		hospitalAdmitBoard.material.map.needsUpdate = true;
+		lastAdmitCount = count;
+	}
+}
+
+function updateHospitalizedVehicles() {
+	const now = performance.now();
+	hospitalizedVehicles = hospitalizedVehicles.filter(record => {
+		if (now >= record.releaseAt) {
+			// Heal and release vehicle back to road
+			const vehicle = record.vehicle;
+			vehicle.userData.hospitalized = false;
+			vehicle.userData.crashProcessed = false;
+
+			// Respawn onto circular road with fresh parameters
+			const roadRadius = 350;
+			const roadWidth = 40;
+			const padding = 2;
+			const dividerGap = 4;
+			const innerMin = roadRadius - (roadWidth / 2) + padding;
+			const innerMax = roadRadius - dividerGap;
+			const outerMin = roadRadius + dividerGap;
+			const outerMax = roadRadius + (roadWidth / 2) - padding;
+			const lane = Math.random() > 0.5 ? -1 : 1;
+			const laneRadius = lane === -1
+				? (innerMin + Math.random() * Math.max(1, (innerMax - innerMin)))
+				: (outerMin + Math.random() * Math.max(1, (outerMax - outerMin)));
+			const angle = Math.random() * Math.PI * 2;
+
+			vehicle.userData.lane = lane;
+			vehicle.userData.radius = laneRadius;
+			vehicle.userData.angle = angle;
+			const targetSpeed = (0.002 + Math.random() * 0.001) * (lane === -1 ? 1 : -1);
+			vehicle.userData.angularSpeed = targetSpeed;
+			vehicle.userData.targetAngularSpeed = targetSpeed;
+			vehicle.position.x = Math.cos(angle) * laneRadius;
+			vehicle.position.z = Math.sin(angle) * laneRadius;
+			vehicle.rotation.y = lane === -1 ? -angle : (-angle + Math.PI);
+
+			// Ensure it's in the traffic list
+			if (!trafficVehicles.includes(vehicle)) {
+				trafficVehicles.push(vehicle);
+			}
+
+			return false; // Remove from hospitalized list
+		}
+		return true; // Keep in hospital
 	});
 }
 
@@ -2529,6 +2782,9 @@ function createEnvironment() {
 
 	// Create police station outside the outer circle
 	createPoliceStation(isDark);
+
+	// Create hospital on the opposite side
+	createHospital(isDark);
 }
 
 function createPoliceStation(isDark) {
@@ -2581,6 +2837,73 @@ function createPoliceStation(isDark) {
 	policeArrestBoard.position.set(policeStationPosition.x, 10, policeStationPosition.z - 14);
 	policeArrestBoard.rotation.y = Math.PI;
 	scene.add(policeArrestBoard);
+}
+
+function createHospital(isDark) {
+	const hospitalGroup = new THREE.Group();
+
+	// Building base - red cross hospital colors
+	const base = new THREE.Mesh(
+		new THREE.BoxGeometry(30, 12, 20),
+		new THREE.MeshStandardMaterial({ color: isDark ? 0x5f1e1e : 0xffffff, roughness: 0.8 })
+	);
+	base.position.set(0, 6, 0);
+	base.castShadow = true;
+	base.receiveShadow = true;
+	hospitalGroup.add(base);
+
+	// Red cross on front
+	const crossVertical = new THREE.Mesh(
+		new THREE.BoxGeometry(3, 8, 0.5),
+		new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 })
+	);
+	crossVertical.position.set(0, 6, 10.5);
+	hospitalGroup.add(crossVertical);
+
+	const crossHorizontal = new THREE.Mesh(
+		new THREE.BoxGeometry(8, 3, 0.5),
+		new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 })
+	);
+	crossHorizontal.position.set(0, 6, 10.5);
+	hospitalGroup.add(crossHorizontal);
+
+	// Sign
+	const sign = new THREE.Mesh(
+		new THREE.BoxGeometry(18, 3, 1),
+		new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: isDark ? 0xff3333 : 0xaa2222, emissiveIntensity: 0.4 })
+	);
+	sign.position.set(0, 12, 10.5);
+	hospitalGroup.add(sign);
+
+	// Simple text bars to indicate "HOSPITAL"
+	for (let i = -8; i <= 8; i += 2) {
+		const bar = new THREE.Mesh(
+			new THREE.BoxGeometry(0.8, 2, 0.6),
+			new THREE.MeshStandardMaterial({ color: 0x222222 })
+		);
+		bar.position.set(i, 12, 11);
+		hospitalGroup.add(bar);
+	}
+
+	// Parking pad
+	const pad = new THREE.Mesh(
+		new THREE.PlaneGeometry(36, 28),
+		new THREE.MeshStandardMaterial({ color: isDark ? 0x111111 : 0xbbbbbb, roughness: 1.0 })
+	);
+	pad.rotation.x = -Math.PI / 2;
+	pad.position.set(0, 0.02, -5);
+	pad.receiveShadow = true;
+	hospitalGroup.add(pad);
+
+	hospitalGroup.position.set(hospitalPosition.x, 0, hospitalPosition.z);
+	scene.add(hospitalGroup);
+	hospital = hospitalGroup;
+
+	// Admit count board
+	hospitalAdmitBoard = createTextBoard('ADMITTED: 0', 24, 8, '#ffffff', '#2d2d2d', true);
+	hospitalAdmitBoard.position.set(hospitalPosition.x, 10, hospitalPosition.z + 14);
+	hospitalAdmitBoard.rotation.y = 0;
+	scene.add(hospitalAdmitBoard);
 }
 
 function updatePoliceArrestBoard() {
@@ -3101,6 +3424,12 @@ function animate() {
 
 	// Update police vehicles
 	updatePoliceVehicles();
+
+	// Update ambulances
+	updateAmbulances();
+
+	// Update hospitalized vehicles
+	updateHospitalizedVehicles();
 
     // Rotate car body slightly based on turning
     if (carBody) {
