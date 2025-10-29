@@ -668,13 +668,16 @@ function createCityBuildings(isDark) {
     const windowColor = isDark ? 0x00d4ff : 0x6b2bff; // Cyan / purple windows
 
     // Building positions scaled 4x
+    // Buildings repositioned to frame the circular road - Downtown Business District
     const buildingPositions = [
-        { x: -200, z: -80, w: 60, h: 25, d: 80 },
-        { x: -220, z: 40, w: 48, h: 30, d: 60 },
-        { x: -180, z: -200, w: 72, h: 20, d: 72 },
-        { x: 200, z: -80, w: 60, h: 28, d: 80 },
-        { x: 220, z: 40, w: 48, h: 22, d: 60 },
-        { x: 180, z: -200, w: 72, h: 35, d: 72 }
+        { x: 0, z: -150, w: 50, h: 30, d: 40 }, // North Building - Company HQ
+        { x: 0, z: 50, w: 50, h: 35, d: 40 }, // South Building - Tech Center
+        { x: 150, z: 0, w: 40, h: 32, d: 50 }, // East Building - Innovation Hub
+        { x: -150, z: 0, w: 40, h: 28, d: 50 }, // West Building - Development Center
+        { x: 120, z: -120, w: 45, h: 26, d: 45 }, // NE Building
+        { x: 120, z: 60, w: 45, h: 30, d: 45 }, // SE Building
+        { x: -120, z: -120, w: 45, h: 24, d: 45 }, // NW Building
+        { x: -120, z: 60, w: 45, h: 28, d: 45 } // SW Building
     ];
 
     buildingPositions.forEach(building => {
@@ -785,19 +788,21 @@ function createNPCs() {
         0xe91e63, 0x9c27b0, 0x673ab7, 0x3f51b5, 0x2196f3, 0x00bcd4
     ];
 
-    // Create NPCs for busy streets (30 NPCs - optimized for performance)
-    // Spawn them avoiding the circular road
-    const roadRadius = 100;
-    const roadWidth = 40;
+    // Create NPCs for busy streets (30 NPCs) - Spawn in designated pedestrian zones
+    // Define safe pedestrian zones (avoiding road radius 80-120)
+    const pedestrianZones = [
+        { name: 'North Park', xMin: -80, xMax: 80, zMin: 140, zMax: 200 },          // North park
+        { name: 'East Skills', xMin: 130, xMax: 180, zMin: -80, zMax: 80 },         // East skills area
+        { name: 'West Career', xMin: -180, xMax: -130, zMin: -80, zMax: 80 },       // West career area
+        { name: 'South Contact', xMin: -60, xMax: 60, zMin: -220, zMax: -140 },     // South contact area
+        { name: 'Inner Circle', xMin: -60, xMax: 60, zMin: -60, zMax: 60 }          // Inner circle (inside road)
+    ];
 
+    // Distribute NPCs across zones (6 per zone)
     for (let i = 0; i < 30; i++) {
-        let x, z, distFromCenter;
-        // Keep trying until we find a position not on the road
-        do {
-            x = (Math.random() - 0.5) * 240;
-            z = -240 + Math.random() * 320;
-            distFromCenter = Math.sqrt(x * x + z * z);
-        } while (distFromCenter > roadRadius - roadWidth / 2 && distFromCenter < roadRadius + roadWidth / 2);
+        const zone = pedestrianZones[i % pedestrianZones.length];
+        const x = zone.xMin + Math.random() * (zone.xMax - zone.xMin);
+        const z = zone.zMin + Math.random() * (zone.zMax - zone.zMin);
 
         const color = npcColors[Math.floor(Math.random() * npcColors.length)];
         createNPC(x, z, color);
@@ -1326,27 +1331,28 @@ function createSkillBuckets() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     // Create puddles with skill buckets (4x scale) - cyberpunk colors
+    // Skill Stations - Eastern district, organized vertically
     const skillGroups = [
         {
-            title: 'BACKEND',
+            title: 'BACKEND DEVELOPMENT',
             skills: ['Java 8', 'Spring Boot', 'Spring MVC', 'Gradle'],
-            x: 80,
-            z: -40,
+            x: 160,
+            z: 60,
             color: 0x00d4ff // Electric cyan
         },
         {
-            title: 'FRONTEND',
-            skills: ['Angular 8', 'HTML/CSS', 'JavaScript', 'REST APIs'],
-            x: 80,
-            z: -100,
-            color: 0xff2e97 // Hot pink
+            title: 'DATA LAYER',
+            skills: ['MySQL', 'MongoDB', 'PostgreSQL', 'Redis'],
+            x: 160,
+            z: 0,
+            color: 0x00ff88 // Neon green
         },
         {
-            title: 'DATABASES & TOOLS',
-            skills: ['MySQL', 'MongoDB', 'Git', 'Jenkins'],
-            x: 80,
-            z: -160,
-            color: 0x00ff88 // Neon green
+            title: 'APIs & ARCHITECTURE',
+            skills: ['REST APIs', 'GraphQL', 'Microservices', 'Cloud'],
+            x: 160,
+            z: -60,
+            color: 0xff2e97 // Hot pink
         }
     ];
 
@@ -1431,13 +1437,13 @@ function createCareerSteppingStones() {
     });
     const stream = new THREE.Mesh(streamGeometry, streamMaterial);
     stream.rotation.x = -Math.PI / 2;
-    stream.position.set(-100, 0.02, -60);
+    stream.position.set(-150, 0.02, 0); // Centered with new mountain positions
     stream.receiveShadow = true;
     scene.add(stream);
 
     // Title sign (4x scale)
     const titleBoard = createTextBoard('CAREER JOURNEY', 40, 10, '#8b5a9e', '#ffffff', true);
-    titleBoard.position.set(-100, 12, 32);
+    titleBoard.position.set(-150, 12, 80); // Above stream
     scene.add(titleBoard);
 
     // Support post (4x scale)
@@ -1449,14 +1455,15 @@ function createCareerSteppingStones() {
     scene.add(post);
 
     // Job milestones as rideable mountains/hills (4x scale)
+    // Career mountains - Western district, evenly spaced along career progression
     const jobs = [
-        { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', z: -20 },
-        { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', z: -60 },
-        { company: 'TCS', role: 'Systems Engineer', years: '2017-2019', z: -100 }
+        { company: 'Morgan Stanley', role: 'Software Engineer', years: '2021-Present', x: -160, z: 60 },
+        { company: 'TIAA GBS', role: 'Software Engineer', years: '2019-2021', x: -160, z: 0 },
+        { company: 'TCS', role: 'Systems Engineer', years: '2017-2019', x: -160, z: -60 }
     ];
 
     jobs.forEach((job, index) => {
-        const xOffset = (index % 2 === 0) ? -140 : -140; // Moved further out to avoid circular road
+        const xOffset = job.x;
 
         // Create mountain/hill shape using multiple geometries (4x scale)
         const mountainGroup = new THREE.Group();
@@ -1577,16 +1584,21 @@ function createTechFlowerGarden() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     // Create a small flower garden for extra tech/tools (4x scale)
+    // Tech Gardens - North Park area
     const gardenPositions = [
-        { x: 40, z: 40 },
-        { x: -40, z: 40 }
+        { x: 60, z: 180 }, // East garden - Frontend
+        { x: -60, z: 180 } // West garden - DevOps
     ];
 
-    const flowers = ['Docker', 'Kubernetes', 'AWS', 'Microservices'];
+    const flowers = [
+        ['Angular', 'React', 'HTML/CSS', 'JavaScript'],
+        ['Docker', 'Kubernetes', 'AWS', 'Jenkins']
+    ];
 
-    gardenPositions.forEach((pos, idx) => {
-        flowers.forEach((flower, fIdx) => {
-            const angle = (fIdx / flowers.length) * Math.PI * 2;
+    gardenPositions.forEach((pos, gardenIdx) => {
+        const gardenFlowers = flowers[gardenIdx];
+        gardenFlowers.forEach((flower, fIdx) => {
+            const angle = (fIdx / gardenFlowers.length) * Math.PI * 2;
             const radius = 12;
             const x = pos.x + Math.cos(angle) * radius;
             const z = pos.z + Math.sin(angle) * radius;
@@ -1638,20 +1650,20 @@ function createContactLilyPond() {
     });
     const pond = new THREE.Mesh(pondGeometry, pondMaterial);
     pond.rotation.x = -Math.PI / 2;
-    pond.position.set(80, 0.02, -220); // Moved to x=80 to avoid road
+    pond.position.set(0, 0.02, -200); // Centered on southern axis - Contact & Welcome Center
     pond.receiveShadow = true;
     scene.add(pond);
 
-    // Title sign (4x scale) - moved with pond
+    // Title sign (4x scale) - centered with pond
     const titleBoard = createTextBoard('WELCOME & CONTACT', 48, 12, '#5a3d54', '#ffffff', true);
-    titleBoard.position.set(80, 12, -160);
+    titleBoard.position.set(0, 12, -140);
     scene.add(titleBoard);
 
     // Support post (4x scale) - moved with pond
     const postGeometry = new THREE.CylinderGeometry(0.8, 0.8, 12, 8);
     const postMaterial = new THREE.MeshStandardMaterial({ color: 0x6d4579 });
     const post = new THREE.Mesh(postGeometry, postMaterial);
-    post.position.set(80, 6, -160);
+    post.position.set(0, 6, -140); // Centered with new pond position
     post.castShadow = true;
     scene.add(post);
 
@@ -1662,7 +1674,7 @@ function createContactLilyPond() {
         roughness: 0.7
     });
     const mainLily = new THREE.Mesh(mainLilyGeometry, mainLilyMaterial);
-    mainLily.position.set(0, 0.6, -220);
+    mainLily.position.set(0, 0.6, -200); // Centered with new pond position
     mainLily.castShadow = true;
     mainLily.receiveShadow = true;
     scene.add(mainLily);
@@ -1683,7 +1695,7 @@ function createContactLilyPond() {
     contactInfo.forEach(info => {
         const radius = 24;
         const x = Math.cos(info.angle) * radius;
-        const z = -220 + Math.sin(info.angle) * radius;
+        const z = -200 + Math.sin(info.angle) * radius; // Updated for new pond center
 
         // Lily pad (4x scale)
         const lilyGeometry = new THREE.CylinderGeometry(8, 8, 1.2, 8);
@@ -1711,7 +1723,7 @@ function createContactLilyPond() {
         roughness: 0.7
     });
     const eduLily = new THREE.Mesh(eduLilyGeometry, eduLilyMaterial);
-    eduLily.position.set(0, 0.6, -252);
+    eduLily.position.set(0, 0.6, -232); // Updated for new pond center (-200 - 32)
     eduLily.castShadow = true;
     eduLily.receiveShadow = true;
     scene.add(eduLily);
@@ -1726,9 +1738,11 @@ function createInteractiveObjects() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     // Barrels scattered around (4x scale)
+    // Barrels - SAFE POSITIONS near buildings, away from road (min 50 units from center)
     const barrelPositions = [
-        { x: 20, z: -20 }, { x: -20, z: -20 }, { x: 48, z: -48 },
-        { x: -48, z: -48 }, { x: 32, z: -120 }, { x: -32, z: -120 }
+        { x: 50, z: 140 }, { x: -50, z: 140 }, // North area
+        { x: 140, z: 100 }, { x: 140, z: -100 }, // East area
+        { x: -140, z: 100 }, { x: -140, z: -100 } // West area
     ];
 
     barrelPositions.forEach(pos => {
@@ -1748,9 +1762,12 @@ function createInteractiveObjects() {
     });
 
     // Traffic cones (4x scale)
+    // Traffic cones - SAFE POSITIONS in pedestrian zones
     const conePositions = [
-        { x: 0, z: 20 }, { x: 12, z: 0 }, { x: -12, z: 0 },
-        { x: 40, z: -60 }, { x: -40, z: -60 } // Moved from (±60, -80) to avoid circular road
+        { x: 30, z: 150 }, { x: -30, z: 150 }, // North park area
+        { x: 140, z: 30 }, // East skills area
+        { x: -140, z: 30 }, // West career area
+        { x: 0, z: -160 } // South contact area
     ];
 
     conePositions.forEach(pos => {
@@ -1769,9 +1786,12 @@ function createInteractiveObjects() {
     });
 
     // Benches (static obstacles, 4x scale)
+    // Benches - North Park plaza seating area
     const benchPositions = [
-        { x: 60, z: 20, rotation: Math.PI / 4 },
-        { x: -60, z: 20, rotation: -Math.PI / 4 }
+        { x: 30, z: 170, rotation: -Math.PI / 4 }, // Facing inward to plaza
+        { x: -30, z: 170, rotation: Math.PI / 4 },
+        { x: 40, z: 190, rotation: 0 }, // Park bench
+        { x: -40, z: 190, rotation: 0 }
     ];
 
     benchPositions.forEach(pos => {
@@ -1882,12 +1902,17 @@ function createEnvironment() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
     // Trees scattered around the edges (4x scale) - removed from road
+    // Trees for North Park and city boundaries
     const treePositions = [
-        { x: -140, z: 40 }, { x: -140, z: -40 }, { x: -140, z: -120 }, { x: -140, z: -200 },
-        { x: 140, z: 40 }, { x: 140, z: -40 }, { x: 140, z: -120 }, { x: 140, z: -200 },
-        { x: -40, z: 40 }, { x: 40, z: 40 }, // Moved from z=72 to avoid circular road
-        // Add more trees for better boundaries
-        { x: -72, z: -140 }, { x: 72, z: -140 }
+        // North Park tree line (z > 140)
+        { x: -100, z: 160 }, { x: -100, z: 180 }, { x: -100, z: 200 },
+        { x: 100, z: 160 }, { x: 100, z: 180 }, { x: 100, z: 200 },
+        // East border near skills
+        { x: 180, z: 80 }, { x: 180, z: -80 },
+        // West border near career
+        { x: -180, z: 80 }, { x: -180, z: -80 },
+        // South border near contact
+        { x: -50, z: -220 }, { x: 50, z: -220 }
     ];
 
     treePositions.forEach(pos => {
@@ -1924,8 +1949,9 @@ function createEnvironment() {
     });
 
     // Decorative rocks (4x scale)
+    // Decorative rocks flanking contact area (south border)
     const rockPositions = [
-        { x: 32, z: -192 }, { x: -32, z: -192 }, { x: 48, z: -220 }
+        { x: 0, z: -220 }, { x: -50, z: -220 }, { x: 50, z: -220 }
     ];
 
     rockPositions.forEach(pos => {
