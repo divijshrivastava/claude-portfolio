@@ -1747,15 +1747,41 @@ function toggleTheme() {
     htmlElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
 
-    // Update scene colors - cyberpunk theme
-    const isDark = newTheme === 'dark';
-    scene.background = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff);
-    scene.fog.color = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff);
+    // Update scene colors if scene is initialized
+    if (!scene) return;
 
-    // Update ground to grass color
+    const isDark = newTheme === 'dark';
+
+    // Update scene background
+    scene.background = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff);
+
+    // Update fog
+    if (scene.fog) {
+        scene.fog.color = new THREE.Color(isDark ? 0x0a0e27 : 0xf0f4ff);
+    }
+
+    // Update ground color
     scene.children.forEach(child => {
-        if (child.geometry && child.geometry.type === 'PlaneGeometry' && child.position.y === 0) {
-            child.material.color.setHex(isDark ? 0x1a2a1a : 0x7cb87c);
+        // Check for the ground plane (PlaneGeometry at y=0 with rotation)
+        if (child.geometry && child.geometry.type === 'PlaneGeometry' &&
+            child.rotation.x === -Math.PI / 2) {
+            child.material.color.setHex(isDark ? 0x0f1933 : 0xc5d5ff);
+        }
+    });
+
+    // Update ambient and directional lights
+    scene.children.forEach(child => {
+        if (child.isAmbientLight) {
+            child.color.setHex(isDark ? 0x4a5a8a : 0xd1dfff);
+            child.intensity = isDark ? 0.4 : 0.6;
+        } else if (child.isDirectionalLight) {
+            if (child.position.x === 30) { // Main directional light
+                child.color.setHex(isDark ? 0x00d4ff : 0xffffff);
+                child.intensity = isDark ? 0.8 : 1.0;
+            } else if (child.position.x === -20) { // Fill light
+                child.color.setHex(isDark ? 0xff2e97 : 0x6b2bff);
+                child.intensity = isDark ? 0.4 : 0.3;
+            }
         }
     });
 }
