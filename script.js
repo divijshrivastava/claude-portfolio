@@ -1250,9 +1250,26 @@ function updateTrafficVehicles() {
             // IMMEDIATE ACTION: Try radius adjustment every 5 frames (not 15)
             if (vehicle.userData.stuckFrames > 5) {
                 if (vehicle.userData.stuckFrames % 5 === 0) {
-                    // Larger radius adjustment to escape faster
-                    const radiusAdjustment = (Math.random() - 0.5) * 8; // ±4 units (doubled)
+                    // Road boundary constraints
+                    const roadRadius = 350;
+                    const roadWidth = 40;
+                    const padding = 2;
+                    const dividerGap = 4;
+                    const innerMin = roadRadius - (roadWidth / 2) + padding; // 332
+                    const innerMax = roadRadius - dividerGap; // 346
+                    const outerMin = roadRadius + dividerGap; // 354
+                    const outerMax = roadRadius + (roadWidth / 2) - padding; // 368
+
+                    // Smaller radius adjustment to stay within bounds
+                    const radiusAdjustment = (Math.random() - 0.5) * 4; // ±2 units (reduced)
                     vehicle.userData.radius += radiusAdjustment;
+
+                    // Clamp radius to stay within lane boundaries
+                    if (vehicle.userData.lane === -1) {
+                        vehicle.userData.radius = Math.max(innerMin, Math.min(innerMax, vehicle.userData.radius));
+                    } else {
+                        vehicle.userData.radius = Math.max(outerMin, Math.min(outerMax, vehicle.userData.radius));
+                    }
 
                     // Also try angular shift to break side-by-side deadlocks
                     const angleShift = (Math.random() - 0.5) * 0.15; // ±0.075 radians
@@ -1272,10 +1289,29 @@ function updateTrafficVehicles() {
                 vehicle.position.z = Math.sin(vehicle.userData.angle) * vehicle.userData.radius;
             }
 
-            // If STILL stuck after 60 frames, teleport slightly forward
+            // If STILL stuck after 60 frames, try lane change instead of teleport
             if (vehicle.userData.stuckFrames === 60) {
-                // Emergency teleport: jump forward by 10 units
-                vehicle.userData.angle += Math.abs(vehicle.userData.angularSpeed) * 20;
+                // Force lane change to opposite lane with valid radius
+                const roadRadius = 350;
+                const roadWidth = 40;
+                const padding = 2;
+                const dividerGap = 4;
+                const innerMin = roadRadius - (roadWidth / 2) + padding;
+                const innerMax = roadRadius - dividerGap;
+                const outerMin = roadRadius + dividerGap;
+                const outerMax = roadRadius + (roadWidth / 2) - padding;
+
+                const newLane = vehicle.userData.lane === -1 ? 1 : -1;
+                const newRadius = newLane === -1
+                    ? (innerMin + innerMax) / 2 // Center of inner lane
+                    : (outerMin + outerMax) / 2; // Center of outer lane
+
+                vehicle.userData.lane = newLane;
+                vehicle.userData.radius = newRadius;
+                vehicle.userData.targetRadius = newRadius;
+
+                // Jump forward on the new lane
+                vehicle.userData.angle += Math.abs(vehicle.userData.angularSpeed) * 10;
                 vehicle.position.x = Math.cos(vehicle.userData.angle) * vehicle.userData.radius;
                 vehicle.position.z = Math.sin(vehicle.userData.angle) * vehicle.userData.radius;
                 vehicle.userData.stuckFrames = 0; // Reset
