@@ -1090,8 +1090,8 @@ function updateTrafficLights() {
 
 function updateTrafficVehicles() {
     trafficVehicles.forEach(vehicle => {
-        // Skip normal movement if vehicle is arrested (being towed/parked)
-        if (vehicle.userData && vehicle.userData.arrested) {
+        // Skip normal movement if vehicle is arrested (being towed/parked) or hospitalized (waiting for ambulance)
+        if (vehicle.userData && (vehicle.userData.arrested || vehicle.userData.hospitalized)) {
             return;
         }
         // Cooldown timers
@@ -1663,11 +1663,14 @@ function spawnAmbulance(vehicle1, vehicle2) {
 		phase: 0
 	};
 
-	// Mark vehicles as hospitalized
+	// Mark vehicles as hospitalized and freeze them at crash site
 	vehicle1.userData.hospitalized = true;
 	vehicle1.userData.angularSpeed = 0; // Stop moving
+	vehicle1.userData.crashPosition = { x: vehicle1.position.x, z: vehicle1.position.z }; // Save crash location
+
 	vehicle2.userData.hospitalized = true;
 	vehicle2.userData.angularSpeed = 0; // Stop moving
+	vehicle2.userData.crashPosition = { x: vehicle2.position.x, z: vehicle2.position.z }; // Save crash location
 
 	ambulances.push(ambulance);
 }
@@ -1681,7 +1684,20 @@ function updateAmbulances() {
 		ambulance.userData.redSiren2.material.emissiveIntensity = rOn ? 0.2 : 2.0;
 
 		if (ambulance.userData.state === 'responding') {
-			// Move to crash site
+			// Move to crash site - keep crashed vehicles frozen
+			const vehicle1 = ambulance.userData.vehicles[0];
+			const vehicle2 = ambulance.userData.vehicles[1];
+
+			// Keep crashed vehicles at their crash positions while ambulance is responding
+			if (vehicle1 && vehicle1.userData.crashPosition) {
+				vehicle1.position.x = vehicle1.userData.crashPosition.x;
+				vehicle1.position.z = vehicle1.userData.crashPosition.z;
+			}
+			if (vehicle2 && vehicle2.userData.crashPosition) {
+				vehicle2.position.x = vehicle2.userData.crashPosition.x;
+				vehicle2.position.z = vehicle2.userData.crashPosition.z;
+			}
+
 			const targetX = ambulance.userData.crashSite.x;
 			const targetZ = ambulance.userData.crashSite.z;
 			const dx = targetX - ambulance.position.x;
@@ -1700,8 +1716,21 @@ function updateAmbulances() {
 				ambulance.userData.loadingTimer = 120; // 2 seconds to load
 			}
 		} else if (ambulance.userData.state === 'loading') {
-			// Wait for loading
+			// Wait for loading - keep vehicles frozen at crash site
 			ambulance.userData.loadingTimer--;
+
+			// Keep crashed vehicles at their crash positions
+			const vehicle1 = ambulance.userData.vehicles[0];
+			const vehicle2 = ambulance.userData.vehicles[1];
+			if (vehicle1 && vehicle1.userData.crashPosition) {
+				vehicle1.position.x = vehicle1.userData.crashPosition.x;
+				vehicle1.position.z = vehicle1.userData.crashPosition.z;
+			}
+			if (vehicle2 && vehicle2.userData.crashPosition) {
+				vehicle2.position.x = vehicle2.userData.crashPosition.x;
+				vehicle2.position.z = vehicle2.userData.crashPosition.z;
+			}
+
 			if (ambulance.userData.loadingTimer <= 0) {
 				ambulance.userData.state = 'transporting';
 			}
