@@ -1031,7 +1031,7 @@ function createTrafficVehicle(x, z, lane) {
 
 function createTrafficVehicles() {
     // Create traffic on both lanes of circular road (reduced for performance)
-    const numVehicles = 32; // Reduced from 20 for better performance
+    const numVehicles = 50; // Reduced from 20 for better performance
     const roadRadius = 350; // Updated to match road
 	const roadWidth = 40;
 
@@ -1655,7 +1655,7 @@ function spawnAmbulance(vehicle1, vehicle2) {
 
 	ambulance.userData = {
 		state: 'responding', // responding -> loading -> transporting -> parked
-		speed: 0.7,
+		speed: 0.15, // Half of car's maxSpeed (0.3)
 		vehicles: [vehicle1, vehicle2],
 		crashSite: { x: crashX, z: crashZ },
 		redSiren1: redSiren1,
